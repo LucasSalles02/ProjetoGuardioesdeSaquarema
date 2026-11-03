@@ -1,0 +1,16 @@
+﻿node_modules/
+dist/
+.env
+.env.*
+!.env.example
+backend/data/*-wal
+backend/data/*-shm
+backend/data/*.sqlite
+backend/data/*.sqlite-journal
+.runtime/
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/data/backups/
