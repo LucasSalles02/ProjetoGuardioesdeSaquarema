@@ -1,0 +1,4 @@
+ALTER TABLE users ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN deactivated_at TEXT;
+ALTER TABLE users ADD CONSTRAINT users_role_allowed
+    CHECK (role IN ('USER', 'GESTOR_ESCOLAR', 'ADMIN'));
