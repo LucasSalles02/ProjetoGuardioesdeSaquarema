@@ -4,11 +4,11 @@ Plataforma de educação ambiental com missões, trilhas de aprendizagem, jogos,
 
 ## Direção de evolução
 
-A documentação acadêmica fornecida pelo usuário orienta as próximas entregas. O [plano de evolução](docs/PLANO_DE_EVOLUCAO.md) compara os 20 requisitos funcionais e as 20 regras de negócio com o código, organiza as lacunas por prioridade e registra critérios de aceite. O frontend permanece em React/JavaScript. A transição técnica para Python/PostgreSQL foi aplicada; Gestão Escolar Unificada e a nova progressão de dez níveis continuam no backlog.
+A documentação acadêmica fornecida pelo usuário orienta as próximas entregas. O [plano de evolução](docs/PLANO_DE_EVOLUCAO.md) compara os 20 requisitos funcionais e as 20 regras de negócio com o código, organiza as lacunas por prioridade e registra critérios de aceite. O frontend permanece em React/JavaScript. A transição para Python/PostgreSQL está aplicada. Perfis e permissões, Unidades Escolares, contexto por sessão, etapas, turmas e vínculos de alunos estão implementados; a curva global de dez níveis ainda consta no plano de evolução.
 
 ## Executar
 
-No workspace atual, a instância PostgreSQL local e a importação já foram preparadas. Para instalar em outra máquina, siga primeiro a [configuração do backend e importação](backend/README.md), incluindo as dependências Python e `DATABASE_URL`.
+**Em outro PC, inclusive sem PostgreSQL configurado, siga primeiro o [guia completo de instalação](docs/CONFIGURACAO_EM_OUTRO_PC.md).** Ele cobre instalação do banco, ambiente Python, `.env`, migrações e administrador inicial. O GitHub contém o código e as migrações; dados e credenciais locais não são transferidos pelo Git. Consulte também a [operação do backend e importação](backend/README.md).
 
 ```sh
 npm ci
@@ -42,9 +42,9 @@ O usuário aceita 3 a 40 letras minúsculas, números, ponto, hífen e sublinhad
 
 Execute `npm run admin:create` somente para provisionar o administrador inicial. Repetir o comando não duplica a conta nem altera sua senha. O reset de contas existentes é realizado pelo administrador no painel: retorna ao CPF cadastrado, revoga sessões e exige uma nova senha no primeiro acesso. O antigo reset por variável de ambiente foi desabilitado. Remova as credenciais do ambiente após o provisionamento inicial.
 
-No painel `/admin/dashboard`, as abas **Usuários** e **Solicitações de cadastro** organizam a administração. O formulário de cadastro fica em `/admin/usuarios/novo`, e a edição em `/admin/usuarios/:userId/editar`. O administrador pode cadastrar, consultar, editar, desativar e resetar o acesso de Aluno (`USER`), Gestor Escolar (`GESTOR_ESCOLAR`) e Administrador (`ADMIN`). CPF de 11 dígitos e nascimento em `DD/MM/AAAA` são obrigatórios nos novos cadastros. O formulário não permite definir senhas: a primeira senha é o CPF, com troca obrigatória em `/primeiro-acesso`, antes de acessar qualquer funcionalidade.
+No painel `/admin/dashboard`, a listagem centraliza a administração de usuários. O formulário de cadastro fica em `/admin/usuarios/novo`, e a edição abre em uma janela sobre a lista, também acessível em `/admin/usuarios/:userId/editar`. A visualização de dados usa uma janela semelhante. O administrador pode cadastrar, consultar, editar, desativar e resetar o acesso de Aluno (`USER`), Gestor Escolar (`GESTOR_ESCOLAR`) e Administrador (`ADMIN`). CPF de 11 dígitos e nascimento em `DD/MM/AAAA` são obrigatórios nos novos cadastros. O formulário não permite definir senhas: a primeira senha é o CPF, com troca obrigatória em `/primeiro-acesso`, antes de acessar qualquer funcionalidade.
 
-O cadastro público em `/cadastro` envia uma solicitação, sem criar conta nem sessão. Após aprovação administrativa, é criada uma conta de Aluno com senha inicial igual ao CPF; a página informa esse fluxo. Edição de dados cadastrais e reset são exclusivos da administração. A desativação e o reset revogam sessões sem apagar histórico. Contas antigas mantêm suas senhas; complete CPF e nascimento na edição antes de resetar. As funções específicas de Gestão Escolar permanecem para uma próxima etapa.
+O cadastro de usuários é exclusivo do administrador. `/cadastro` redireciona ao login e `POST /api/auth/register` retorna 403. A validação de solicitações foi removida; novos cadastros administrativos usam CPF como senha inicial com troca obrigatória. Edição de dados cadastrais e reset são exclusivos da administração. A desativação e o reset revogam sessões sem apagar histórico. Contas antigas mantêm suas senhas; complete CPF e nascimento na edição antes de resetar. A Gestão Escolar implementada está descrita em [Gestão de Turmas e Alunos](docs/GESTAO_TURMAS_E_ALUNOS.md).
 
 ## Dados e compatibilidade
 
@@ -63,3 +63,19 @@ As contas administrativas existentes são preservadas. Revise contas criadas pel
 As rotas estão em `src/routes`, as páginas em `src/pages`, a tela reutilizável de login em `src/components/LoginScreen.jsx` e a API ativa em `backend/python/gds`. O código Node em `backend/src` é legado explícito para regressão e reversão controlada. Veja [operação, migração e testes do backend](backend/README.md).
 
 Consulte [o relatório técnico](docs/REVISAO_TECNICA.md) para a estrutura anterior e atual, arquivos removidos, decisões de compatibilidade, testes executados e pendências.
+
+## Perfis de acesso
+
+Em Administração > Gerenciar Usuários e Perfis, a aba **Perfis de acesso** permite consultar Administrador, Gestão Escolar e Aluno, criar perfis personalizados e definir módulos/ações. Atribua o perfil no cadastro ou na edição do usuário. A API verifica as permissões em cada requisição. Consulte [a matriz e as regras de delegação](docs/PERFIS_DE_ACESSO.md); recursos escolares identificados como previstos continuam pendentes.
+
+## Unidades Escolares
+
+Em Administração > Gerenciar Unidades Escolares, cadastre o nome da unidade e autorize seus gestores. O ID é gerado automaticamente. Antes de entrar, o gestor escolhe uma unidade autorizada em `/selecionar-unidade`. A página inicial e o perfil exibem a unidade ativa; o menu do perfil permite trocar para outra unidade vinculada. A seleção é validada pela API e mantida por sessão. Consulte [campos do diagrama e regras de autorização](docs/UNIDADES_ESCOLARES.md).
+
+## Gestão de Turmas e Alunos
+
+O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadastra turmas por etapa, vincula/transfere alunos e consulta progresso e consolidados sem editar XP. O administrador define escola e matrícula no cadastro do aluno e mantém as **Etapas Escolares** ao lado de Perfis de acesso, com padrões do 2º ao 6º ano. Consulte [fluxos, autorização e integridade](docs/GESTAO_TURMAS_E_ALUNOS.md).
+
+## Desativação e saída
+
+Unidades Escolares possui abas de ativas e desativadas. Desativar exige confirmação dos efeitos: alunos ficam sem unidade/turma, gestores perdem a autorização e os contextos da unidade são limpos; contas e progresso são preservados. Todo botão **Sair** solicita confirmação em qualquer perfil. XP e nível do perfil suspenso são exibidos somente para Aluno.

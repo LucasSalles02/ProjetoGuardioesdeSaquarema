@@ -48,6 +48,9 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
         row.setdefault("cpf", None)
         row.setdefault("birth_date", None)
         row.setdefault("must_change_password", False)
+        row.setdefault("access_profile_id", None)
+    for row in data["sessions"]:
+        row.setdefault("school_id", None)
     migrate(url)
     with connection(url) as db:
         db.execute("SELECT pg_advisory_xact_lock(18022027)")
@@ -55,6 +58,10 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
             return {"already_imported": True, "counts": counts, "backup": str(backup)}
         if db.execute("SELECT COUNT(*) AS n FROM registration_requests").fetchone()["n"]:
             raise RuntimeError("Destino possui solicitacoes de cadastro. Use um banco vazio para importar.")
+        if db.execute("SELECT COUNT(*) AS n FROM schools").fetchone()["n"]:
+            raise RuntimeError("Destino possui unidades escolares. Use um banco vazio para importar.")
+        if db.execute("SELECT COUNT(*) AS n FROM school_classes").fetchone()["n"]:
+            raise RuntimeError("Destino possui turmas. Use um banco vazio para importar.")
         # No merging by email and no overwriting a database already in use.
         for table in TABLES:
             if db.execute(sql.SQL("SELECT COUNT(*) AS n FROM {}").format(sql.Identifier(table))).fetchone()["n"]:

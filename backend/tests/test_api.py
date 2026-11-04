@@ -19,7 +19,7 @@ def test_health_and_registration(client, account, auth_headers, db_url):
 
 def test_login_duplicate_logout_and_password(client, account, auth_headers):
     duplicate = client.post("/api/auth/register", json={"nome": "Aluno", "email": " ALUNO@EXAMPLE.COM ", "senha": "segredo123"})
-    assert duplicate.status_code == 400
+    assert duplicate.status_code == 403
     assert client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": "errada"}).status_code == 401
     logged = client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": "segredo123"})
     assert logged.status_code == 200

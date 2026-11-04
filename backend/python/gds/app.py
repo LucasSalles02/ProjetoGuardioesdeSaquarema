@@ -47,13 +47,13 @@ def create_app(url=None):
         yield
 
     app = FastAPI(title="Guardiões de Saquarema", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["Content-Type", "Authorization", "X-School-Id"])
     app.state.limiter = LoginLimiter()
 
-    def execute(method, path, body, bearer):
+    def execute(method, path, body, bearer, requested_school):
         # One connection and transaction per request: errors roll back all rewards and content changes.
         with connection(url) as db:
-            return dispatch(Service(db), method, path, body, bearer)
+            return dispatch(Service(db), method, path, body, bearer, requested_school)
 
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PATCH", "DELETE", "PUT"])
     async def api(request: Request, path: str):
@@ -75,13 +75,13 @@ def create_app(url=None):
                         raise ApiError("JSON invalido.") from None
                     if not isinstance(body, dict):
                         raise ApiError("JSON invalido.")
-            if request.method == "POST" and path in ["auth/login", "auth/admin/login", "auth/register"]:
+            if request.method == "POST" and path in ["auth/login", "auth/admin/login"]:
                 app.state.limiter.check(request.client.host if request.client else "unknown")
             match = re.fullmatch(r"Bearer\s+(.+)", request.headers.get("authorization", ""), re.IGNORECASE)
-            result = await run_in_threadpool(execute, request.method, path, body, match.group(1) if match else "")
-            return JSONResponse(result, status_code=202 if request.method == "POST" and path == "auth/register" else 200)
+            result = await run_in_threadpool(execute, request.method, path, body, match.group(1) if match else "", request.headers.get("x-school-id", ""))
+            return JSONResponse(result)
         except ApiError as exc:
-            return JSONResponse({"erro": str(exc)}, status_code=exc.status)
+            return JSONResponse({"erro": str(exc), **({"codigo": exc.code} if exc.code else {})}, status_code=exc.status)
         except psycopg.errors.UniqueViolation:
             return JSONResponse({"erro": "Registro ja cadastrado."}, status_code=400)
         except Exception as exc:

@@ -14,3 +14,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 backend/data/backups/
+backups/
+*.dump
+*.backup
+*.sql.gz
+*.sql.gzip
+*.log
+.pgpass
+pgpass.conf
+local-postgres.json

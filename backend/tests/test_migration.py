@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from gds.admin import provision_admin
 from gds.app import create_app
+from gds.access import allowed
 from gds.database import connection, migrate
 from gds.import_sqlite import TABLES, import_sqlite
 from gds.security import verify_password
@@ -76,9 +77,9 @@ def test_import_preserves_data_sessions_and_node_contract(db_url, legacy_source,
         for path, expected in contract.items():
             # Migration 002 adds lifecycle fields; all prior contract fields must still match.
             if path == "/api/auth/me":
-                expected = {"usuario": {**expected["usuario"], "active": True, "must_change_password": False}}
+                expected = {"usuario": {**expected["usuario"], "active": True, "must_change_password": False, "profile_id": "ADMIN", "profile_name": "Administrador", "permissions": sorted(allowed("ADMIN"))}}
             elif path == "/api/admin/users":
-                expected = {"usuarios": [{**row, "active": True, "deactivated_at": None, "cpf": None, "birth_date": None, "must_change_password": False} for row in expected["usuarios"]]}
+                expected = {"usuarios": [{**row, "active": True, "deactivated_at": None, "cpf": None, "birth_date": None, "must_change_password": False, "profile_id": "ADMIN", "profile_name": "Administrador"} for row in expected["usuarios"]]}
             response = client.get(path, headers=headers)
             assert response.status_code == 200, path
             assert response.json() == expected, path
@@ -152,7 +153,7 @@ def test_pbkdf2_compatibility(client, account, db_url, password):
 def test_migrations_idempotent_and_checksum_guard(db_url):
     migrate(db_url)
     with connection(db_url) as db:
-        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 4
+        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 9
         db.execute("UPDATE schema_migrations SET checksum='invalid'")
     with pytest.raises(RuntimeError, match="foi alterada"):
         migrate(db_url)

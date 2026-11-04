@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Gamepad2, Layers3, Loader2, Plus, Save, Target } from "lucide-react";
+import { ArrowLeft, BookOpen, Gamepad2, Layers3, Loader2, Plus, Save, Target } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../services/permissions";
 import PageShell from "../components/PageShell";
 import { admin as adminAPI } from "../services/api";
 
@@ -126,9 +129,10 @@ export default function GestaoConteudo() {
 
   return (
     <PageShell
-      title="Gestao"
-      description="Conteudo administravel de Guardiões de Saquarema."
+      title="Gerenciar missões, aulas e jogos"
+      description="Organize o conteúdo e as atividades de Guardiões de Saquarema."
     >
+      <Link to="/admin/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-sky-700 hover:text-sky-900"><ArrowLeft size={17} aria-hidden="true" /> Voltar à Administração</Link>
       {feedback ? (
         <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
           {feedback}
@@ -323,6 +327,9 @@ function ContentItem({ title, meta, active, onEdit }) {
 }
 
 function FormShell({ title, editing, saving, onNew, onSubmit, children }) {
+  const { user } = useAuth();
+  const key = title === "Missao" ? "mission_admin" : title === "Jogo" ? "game_admin" : "content";
+  const allowed = can(user, `${key}.${title === "Jogo" || editing ? "update" : "create"}`);
   return (
     <form onSubmit={onSubmit} className="sea-card rounded-3xl p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -336,10 +343,11 @@ function FormShell({ title, editing, saving, onNew, onSubmit, children }) {
           <Plus size={17} aria-hidden="true" />
         </button>
       </div>
-      <div className="space-y-3">{children}</div>
+      {!allowed && <p className="mb-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Seu perfil permite consulta, mas não permite salvar esta operação.</p>}
+      <fieldset disabled={!allowed || saving} className="space-y-3">{children}</fieldset>
       <button
         type="submit"
-        disabled={saving}
+        disabled={saving || !allowed}
         className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-black text-white hover:bg-sky-600 disabled:opacity-60"
       >
         {saving ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}

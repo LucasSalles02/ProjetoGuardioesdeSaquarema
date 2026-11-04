@@ -10,7 +10,7 @@ Referências das bibliotecas: [FastAPI](https://fastapi.tiangolo.com/advanced/ev
 - Foram importados e conferidos os registros das 12 tabelas de negócio existentes, preservando IDs, hashes, sessões, XP, conclusões e sessões de jogo em andamento.
 - O SQLite original permanece em `backend/data/ecomar.sqlite`. A cópia consistente utilizada na importação fica em `backend/data/backups/`.
 - A curva antiga de XP e o limite histórico de 80 atividades foram preservados nesta migração de tecnologia. EV02 e EV03 continuam pendentes no plano; não foram misturados à transição.
-- A etapa posterior de controle administrativo acrescentou o perfil `GESTOR_ESCOLAR` e cadastro/consulta/desativação pelo administrador. Escolas, turmas institucionais e funções específicas de gestor continuam para uma próxima etapa.
+- A etapa posterior de controle administrativo acrescentou o perfil `GESTOR_ESCOLAR` e cadastro/consulta/desativação pelo administrador. Unidades, vínculos institucionais, turmas, etapas e consultas pedagógicas estão implementados; consulte [Gestão de Turmas e Alunos](../docs/GESTAO_TURMAS_E_ALUNOS.md).
 
 ## Preparar outro ambiente
 
@@ -35,7 +35,7 @@ Os valores acima são marcadores, não credenciais reais. Não use prefixo `VITE
 
 ## Instância local isolada deste workspace
 
-Foi preparado um runtime Python portátil oficial e um cluster PostgreSQL 17.11 em `.runtime/`, ignorados pelo Git. Nenhum serviço Windows ou instalação global foi criado. O cluster escuta somente `127.0.0.1:55432`, usa senha aleatória e autenticação SCRAM. A conexão está no `.env` local; a configuração auxiliar está em `.runtime/local-postgres.json`. Os segredos não são impressos.
+O projeto permite usar Python instalado ou portátil e um cluster PostgreSQL isolado em `.runtime/`, ignorado pelo Git. Esses ambientes precisam ser preparados em cada computador; o clone do repositório não os instala. Consulte [o guia de configuração em outro PC](../docs/CONFIGURACAO_EM_OUTRO_PC.md). O cluster escuta somente `127.0.0.1:55432`, usa senha aleatória e autenticação SCRAM. A conexão está no `.env` local; a configuração auxiliar está em `.runtime/local-postgres.json`. Os segredos não são impressos.
 
 `.runtime/postgres-data` contém o banco persistente local: não é cache descartável. Faça backup antes de mover ou remover esse diretório.
 
@@ -79,11 +79,11 @@ npm run dev:frontend
 
 As variáveis `GUARDIOES_DE_SAQUAREMA_ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL` e `ADMIN_NAME` são lidas com o mesmo prefixo; os aliases `ECOMAR_ADMIN_*` continuam válidos. O provisionamento do administrador inicial é idempotente, exige senha de 12–256 caracteres e não promove uma conta comum por email. O reset por CLI foi desabilitado: contas existentes são resetadas exclusivamente pelo fluxo autenticado de administrador, retornando ao CPF cadastrado. PBKDF2 legado e scrypt continuam verificáveis, sem solicitar senhas aos usuários durante a importação.
 
-Rotas do frontend preservadas: `/login`, `/cadastro`, `/admin/login`, `/admin/dashboard` e `/gestao`. O health check `/api/health` inclui `runtime: python` e `database: postgresql`, com consulta real ao banco.
+Rotas ativas do frontend: `/login`, `/admin/login`, `/admin/dashboard` e `/gestao`. `/cadastro` redireciona para o login. O health check `/api/health` inclui `runtime: python` e `database: postgresql`, com consulta real ao banco.
 
 ## Gerenciamento administrativo de usuários
 
-Em `/admin/dashboard`, o administrador pode listar/buscar usuários, filtrar por perfil/situação, consultar detalhes, editar dados, confirmar desativação e resetar o acesso. O cadastro possui tela própria em `/admin/usuarios/novo`; a edição fica em `/admin/usuarios/{id}/editar`. Os formulários exigem nome, usuário único, email único, perfil, CPF único de 11 dígitos e data de nascimento válida em `DD/MM/AAAA`. O CPF é armazenado sem pontuação e com zeros à esquerda preservados; a data é um `DATE` no PostgreSQL, serializado em formato brasileiro nas APIs administrativas. A validação de CPF cobre o formato solicitado de 11 dígitos, sem consulta externa.
+Em `/admin/dashboard`, o administrador pode listar/buscar usuários, filtrar por perfil/situação, consultar detalhes, editar dados, confirmar desativação e resetar o acesso. O cadastro possui tela própria em `/admin/usuarios/novo`; a edição abre em uma janela sobre o painel em `/admin/usuarios/{id}/editar`. A visualização de dados também abre em uma janela compacta. Os formulários exigem nome, usuário único, email único, perfil, CPF único de 11 dígitos e data de nascimento válida em `DD/MM/AAAA`. O CPF é armazenado sem pontuação e com zeros à esquerda preservados; a data é um `DATE` no PostgreSQL, serializado em formato brasileiro nas APIs administrativas. A validação de CPF cobre o formato solicitado de 11 dígitos, sem consulta externa.
 
 Não se define senha no cadastro nem na edição administrativa; tentativas de enviar campos de senha são recusadas. A senha inicial é o CPF, armazenado com hash scrypt, e `must_change_password` restringe o acesso até o titular criar sua nova senha. A nova senha exige 8–256 caracteres (12 no mínimo para ADMIN), confirmação e valor diferente do CPF. A conclusão invalida os tokens iniciais e emite uma nova sessão. CPF pode identificar a conta nos dois logins; email e usuário anteriores continuam aceitos nos respectivos fluxos. O cadastro não substitui a sessão do administrador.
 
@@ -102,24 +102,13 @@ Desativar preserva usuário, histórico, conquistas e progresso. A conta não po
 
 Edição e reset exigem administrador ativo com senha já definida. A própria conta administrativa não pode ser rebaixada por seu titular. Alteração de CPF/email/usuário/perfil revoga sessões; mudar CPF durante o primeiro acesso pendente também atualiza a senha inicial para o novo CPF. Depois de uma senha pessoal definida, editar CPF não altera essa senha. Reset não reativa contas desativadas. Contas antigas sem CPF/nascimento não são modificadas automaticamente: complete os dados antes de resetar. Edição de cadastro pelo antigo `/account/profile` é recusada, inclusive para administradores: use as rotas de administração. A alteração voluntária da própria senha, com senha atual, permanece separada do reset administrativo.
 
-As migrações `003_cpf_first_access.sql` e `004_registration_requests.sql` adicionam CPF, nascimento, troca obrigatória e fila de solicitações, preservando dados e senhas existentes. Reativação, exclusão definitiva, vínculos institucionais e funções específicas de Gestão Escolar continuam fora desta etapa.
+As migrações `003_cpf_first_access.sql` e `004_registration_requests.sql` adicionam CPF, nascimento, troca obrigatória e fila de solicitações, preservando dados e senhas existentes. Reativação de contas e exclusão definitiva de usuários continuam fora desta etapa. As entregas posteriores de vínculos, unidades, turmas e etapas estão descritas em [Gestão de Turmas e Alunos](../docs/GESTAO_TURMAS_E_ALUNOS.md).
 
-## Solicitações externas e primeiro acesso
+## Cadastro exclusivo pela administração
 
-`POST /api/auth/register` recebe dados sem senha e retorna **202 PENDING**, sem conta e sem token. A tela `/cadastro` informa que, após validação, a primeira senha será o CPF. Solicitações públicas sempre resultam em Aluno: campos de privilégio enviados pelo navegador não promovem ninguém. Pedidos com CPF/email/usuário já registrados ou pendentes são recusados.
+`POST /api/auth/register` retorna **403**. O cadastro é realizado exclusivamente por administradores autenticados em `POST /api/admin/users`, com CPF como senha inicial e troca obrigatória. A interface `/cadastro` redireciona para `/login`.
 
-A aba **Solicitações de cadastro** permite analisar dados, aprovar ou recusar, com motivo opcional. A aprovação cria uma única conta com senha inicial CPF e troca obrigatória; repetições e concorrência não duplicam usuários. Recusa preserva o pedido, sem criar conta; um novo pedido pode ser apresentado depois. Não há envio de email automático nesta etapa.
-
-| Método e rota | Acesso |
-| --- | --- |
-| `GET /api/admin/registration-requests` | Administrador: listar solicitações e decisões |
-| `POST /api/admin/registration-requests/{id}/approve` | Administrador: aprovar pedido |
-| `POST /api/admin/registration-requests/{id}/reject` | Administrador: recusar pedido |
-| `POST /api/auth/first-access/password` | Titular com sessão inicial restrita: definir sua senha |
-
-Uma sessão com troca pendente só pode consultar `/auth/me`, sair ou definir sua senha inicial. As APIs educativas e administrativas retornam 403 até a conclusão. O frontend redireciona para `/primeiro-acesso`, mas a restrição é aplicada também no servidor. Reset e edição não ficam disponíveis nessa sessão inicial.
-
-Validação da evolução de CPF e solicitações: **49 testes Python/PostgreSQL aprovados**, com aprovação/recusa, primeiro acesso restrito, troca obrigatória, edição e reset exclusivos da administração, CPF de 11 dígitos, datas brasileiras, revogação e preservação dos dados. Após os ajustes finais nos dados opcionais de escola/turma, os 20 testes desses fluxos foram executados novamente. Lint e build aprovados. As migrações foram aplicadas no banco local preservando contas, hashes, perfis e total de XP. Login administrativo existente, listagem e fila de solicitações foram conferidos pelo Vite; novas solicitações e usuários de teste ficaram em schemas temporários. A entrega do HTML das novas rotas foi validada; a navegação visual completa não foi repetida nesta etapa.
+A fila de solicitações e seus endpoints de listagem, aprovação e recusa foram removidos do fluxo ativo (retornam 404). A tabela histórica e a migração já aplicada permanecem para preservar dados e backups.
 
 ## Segurança transacional e operação
 
@@ -173,3 +162,9 @@ backend/
   server.js, createAdmin.js      # launchers compatíveis para Python
   data/ecomar.sqlite, backups/   # origem preservada e cópias locais
 ```
+
+## Unidades Escolares e vínculos
+
+A migração `006_school_units.sql` implementa Escola e VinculoGestorEscola. A listagem do gestor usa os vínculos autorizados da conta autenticada; editar o cadastro de usuário ou um campo de escola em texto não concede esse acesso. Consulte [API, permissões e campos](../docs/UNIDADES_ESCOLARES.md).
+
+A migração `007_session_school_context.sql` mantém a unidade ativa por sessão. `GET/POST /api/school-context` consultam/trocam a seleção; `GET /api/school-current` retorna somente a unidade ativa autorizada. Um novo login exige nova escolha; recarregar a mesma sessão preserva a seleção após validar o vínculo. Os códigos `UNIDADE_OBRIGATORIA` e `UNIDADE_DESATUALIZADA` retornam HTTP 409 e atualizam o seletor no navegador.

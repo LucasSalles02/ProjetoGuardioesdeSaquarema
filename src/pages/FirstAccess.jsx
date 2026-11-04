@@ -4,7 +4,7 @@ import { KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function FirstAccess() {
-  const { user, loading, definirSenhaInicial, logout } = useAuth();
+  const { user, loading, definirSenhaInicial, requestLogout } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ novaSenha: "", confirmarSenha: "" });
   const [busy, setBusy] = useState(false);
@@ -16,7 +16,7 @@ export default function FirstAccess() {
     event.preventDefault(); setError("");
     if (form.novaSenha !== form.confirmarSenha) { setError("As senhas precisam ser iguais."); return; }
     setBusy(true);
-    try { const updated = await definirSenhaInicial(form); navigate(updated.admin ? "/admin/dashboard" : "/", { replace: true }); }
+    try { const updated = await definirSenhaInicial(form); navigate(updated.admin ? "/admin/dashboard" : updated.role === "GESTOR_ESCOLAR" ? "/selecionar-unidade" : "/", { replace: true }); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -29,6 +29,6 @@ export default function FirstAccess() {
       <p className="text-xs text-slate-500">Use entre {user.admin ? 12 : 8} e 256 caracteres.</p>
       <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-bold text-white disabled:opacity-60">{busy && <Loader2 className="animate-spin" size={17} aria-hidden="true" />}{busy ? "Salvando..." : "Definir senha e continuar"}</button>
     </fieldset></form>
-    <button type="button" disabled={busy} onClick={async () => { await logout(); navigate("/login", { replace: true }); }} className="mt-4 w-full py-2 text-sm font-bold text-slate-600">Sair</button>
+    <button type="button" disabled={busy} onClick={async () => { if (await requestLogout()) navigate("/login", { replace: true }); }} className="mt-4 w-full py-2 text-sm font-bold text-slate-600">Sair</button>
   </section></main>;
 }

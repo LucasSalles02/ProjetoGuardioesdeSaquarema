@@ -500,6 +500,11 @@ export class GuardioesDeSaquaremaService {
     return { usuarios: this.db.prepare("SELECT id, nome, username, email, role, created_at, updated_at FROM users ORDER BY created_at DESC").all() };
   }
 
+  getAdminUser(userId, targetId) {
+    this.requireAdmin(userId);
+    return { usuario: this.publicUser(targetId) };
+  }
+
   getAdminContent(userId) {
     this.requireAdmin(userId);
 
