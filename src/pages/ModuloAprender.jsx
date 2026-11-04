@@ -10,11 +10,12 @@ import {
 import { Link, useParams } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import { aprendizado } from "../services/api";
+import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
 
 export default function ModuloAprender() {
   const { moduloId } = useParams();
-  const { atualizarUsuario } = useAuth();
+  const { user, atualizarUsuario } = useAuth();
   const [modulo, setModulo] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [concluindo, setConcluindo] = useState(null);
@@ -174,7 +175,7 @@ export default function ModuloAprender() {
               <button
                 type="button"
                 onClick={() => handleConcluir(lesson.id)}
-                disabled={lesson.concluida || concluindo === lesson.id}
+                disabled={!can(user, "learning.complete") || lesson.concluida || concluindo === lesson.id}
                 className="inline-flex min-w-40 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-2.5 text-sm font-black text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
               >
                 {concluindo === lesson.id ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : null}

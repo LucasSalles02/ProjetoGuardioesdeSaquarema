@@ -24,7 +24,7 @@ export default function LoginScreen({ administrative = false }) {
 
     try {
       const account = await (administrative ? adminLogin(form) : login(form));
-      navigate(account.must_change_password ? "/primeiro-acesso" : account.admin ? "/admin/dashboard" : "/", { replace: true });
+      navigate(account.must_change_password ? "/primeiro-acesso" : account.admin ? "/admin/dashboard" : account.role === "GESTOR_ESCOLAR" ? "/selecionar-unidade" : "/", { replace: true });
     } catch (error) {
       setErro(error.message || "Não foi possível entrar.");
     } finally {
@@ -68,7 +68,7 @@ export default function LoginScreen({ administrative = false }) {
           <div className="mb-8">
             <p className="text-sm font-bold uppercase tracking-wide text-sky-700">Acesso seguro</p>
             <h2 className="mt-2 text-3xl font-black">{administrative ? "Acesso administrativo" : "Entrar na conta"}</h2>
-            <p className="mt-2 text-sm text-slate-600">{administrative ? "Use seu CPF ou usuário administrativo e senha." : "Use seu CPF ou email e senha."} No primeiro acesso após cadastro ou reset, a senha é o CPF com 11 dígitos. Solicitações externas precisam ser aprovadas antes.</p>
+            <p className="mt-2 text-sm text-slate-600">{administrative ? "Use seu CPF ou usuário administrativo e senha." : "Use seu CPF ou email e senha."} No primeiro acesso após cadastro ou reset, a senha é o CPF com 11 dígitos. O cadastro é realizado pelo administrador.</p>
           </div>
 
           {location.state?.notice && <p role="status" className="mb-4 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">{location.state.notice}</p>}
@@ -123,10 +123,7 @@ export default function LoginScreen({ administrative = false }) {
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-600">
-            {administrative ? "Acesso comum?" : "Ainda não tem conta?"}{" "}
-            <Link className="font-bold text-sky-700 hover:text-sky-900" to={administrative ? "/login" : "/cadastro"}>
-              {administrative ? "Entrar como usuário" : "Criar cadastro"}
-            </Link>
+            {administrative ? <>Acesso comum? <Link className="font-bold text-sky-700 hover:text-sky-900" to="/login">Entrar como usuário</Link></> : "Precisa de uma conta? Solicite seu cadastro ao administrador."}
           </p>
         </div>
       </section>

@@ -17,9 +17,9 @@
     "db:migrate": "node --env-file-if-exists=.env scripts/backend.js migrate",
     "db:import:sqlite": "node --env-file-if-exists=.env scripts/backend.js import-sqlite",
     "db:check": "node --env-file-if-exists=.env scripts/backend.js check",
-    "db:setup:local": "node scripts/postgres-local.js setup",
-    "db:start": "node scripts/postgres-local.js start",
-    "db:stop": "node scripts/postgres-local.js stop",
+    "db:setup:local": "node --env-file-if-exists=.env scripts/postgres-local.js setup",
+    "db:start": "node --env-file-if-exists=.env scripts/postgres-local.js start",
+    "db:stop": "node --env-file-if-exists=.env scripts/postgres-local.js stop",
     "backend:legacy": "node --env-file-if-exists=.env backend/legacy/server.js"
   },
   "dependencies": {
@@ -44,5 +44,8 @@
   },
   "engines": {
     "node": ">=22.13.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
   }
 }

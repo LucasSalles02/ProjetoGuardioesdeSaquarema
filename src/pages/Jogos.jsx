@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Brain, Gamepad2, Loader2, Puzzle, RotateCcw, Trophy } from "lucide-react";
 import PageShell from "../components/PageShell";
 import { jogos as jogosAPI } from "../services/api";
+import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
 
 export default function Jogos() {
-  const { atualizarUsuario } = useAuth();
+  const { user, atualizarUsuario } = useAuth();
   const [catalogo, setCatalogo] = useState([]);
   const [feedback, setFeedback] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -120,7 +121,7 @@ export default function Jogos() {
                 <button
                   type="button"
                   onClick={iniciarMemoria}
-                  disabled={memoriaBusy === "start"}
+                  disabled={!can(user, "games.play") || memoriaBusy === "start"}
                   className="inline-flex items-center gap-2 rounded-2xl bg-sky-500 px-4 py-2.5 text-sm font-black text-white hover:bg-sky-600 disabled:opacity-60"
                 >
                   {memoriaBusy === "start" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RotateCcw size={16} aria-hidden="true" />}
@@ -137,7 +138,7 @@ export default function Jogos() {
                       key={card.id}
                       type="button"
                       onClick={() => virarCarta(card.id)}
-                      disabled={Boolean(memoriaBusy) || card.matched || memoria.completed}
+                      disabled={!can(user, "games.play") || Boolean(memoriaBusy) || card.matched || memoria.completed}
                       className={`flex aspect-[4/3] items-center justify-center rounded-2xl border px-2 text-center text-sm font-black transition ${
                         card.visible
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
@@ -165,7 +166,7 @@ export default function Jogos() {
                 <button
                   type="button"
                   onClick={iniciarPuzzle}
-                  disabled={puzzleBusy}
+                  disabled={!can(user, "games.play") || puzzleBusy}
                   className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   {puzzleBusy ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RotateCcw size={16} aria-hidden="true" />}
@@ -182,7 +183,7 @@ export default function Jogos() {
                       key={`${tile}-${index}`}
                       type="button"
                       onClick={() => moverPeca(tile)}
-                      disabled={puzzleBusy || tile === 0 || puzzle.completed}
+                      disabled={!can(user, "games.play") || puzzleBusy || tile === 0 || puzzle.completed}
                       className={`flex aspect-square items-center justify-center rounded-2xl text-2xl font-black transition ${
                         tile === 0
                           ? "border-2 border-dashed border-slate-300 bg-slate-50 text-transparent"

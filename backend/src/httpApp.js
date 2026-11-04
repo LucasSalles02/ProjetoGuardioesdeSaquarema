@@ -29,7 +29,7 @@ export function createGuardioesDeSaquaremaServer(options = {}) {
       }
 
       const body = await readJson(request);
-      if (request.method === "POST" && ["/api/auth/login", "/api/auth/admin/login", "/api/auth/register"].includes(url.pathname)) {
+      if (request.method === "POST" && ["/api/auth/login", "/api/auth/admin/login"].includes(url.pathname)) {
         const now = Date.now();
         for (const [key, entry] of attempts) if (entry.until <= now) attempts.delete(key);
         const key = request.socket.remoteAddress;
@@ -61,9 +61,10 @@ export function createGuardioesDeSaquaremaServer(options = {}) {
 const routes = [
   route("POST", /^\/api\/auth\/admin\/login$/, ({ body, service }) => service.login(body, true)),
   route("GET", /^\/api\/admin\/users$/, authenticated((id, { service }) => service.listUsers(id))),
+  route("GET", /^\/api\/admin\/users\/([^/]+)$/, authenticated((id, { params, service }) => service.getAdminUser(id, params[0]))),
   route("GET", /^\/api\/health$/, () => ({ ok: true, service: "guardioes-de-saquarema-backend" })),
 
-  route("POST", /^\/api\/auth\/register$/, ({ body, service }) => service.register(body)),
+  route("POST", /^\/api\/auth\/register$/, () => { throw new HttpError(403, "Cadastro publico desativado. Solicite seu cadastro ao administrador."); }),
   route("POST", /^\/api\/auth\/login$/, ({ body, service }) => service.login(body)),
   route("GET", /^\/api\/auth\/me$/, ({ service, token }) => service.me(token)),
   route("POST", /^\/api\/auth\/logout$/, ({ service, token }) => service.logout(token)),

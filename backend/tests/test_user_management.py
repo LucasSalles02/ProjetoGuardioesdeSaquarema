@@ -95,7 +95,14 @@ def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, ad
     headers, password = enter(client, payload)
     extra = login(client, payload, password).json()["token"]
     evidence = {"residuo1": "garrafa", "residuo2": "sacola", "residuo3": "canudo"}
-    assert client.post("/api/missions/lixo-marinho/submit", headers=headers, json=evidence).status_code == 200
+    if role == "GESTOR_ESCOLAR":
+        assert client.post("/api/missions/lixo-marinho/submit", headers=headers, json=evidence).status_code == 403
+        # Preserve legacy progress without granting student actions to a school manager.
+        with connection(db_url) as db:
+            from gds.service import Service
+            Service(db).submit_mission(target["id"], "lixo-marinho", evidence)
+    else:
+        assert client.post("/api/missions/lixo-marinho/submit", headers=headers, json=evidence).status_code == 200
     response = client.post(f"/api/admin/users/{target['id']}/reset-password", headers=admin_headers)
     assert response.status_code == 200 and response.json()["usuario"]["must_change_password"] is True
     for value in [headers, {"Authorization": f"Bearer {extra}"}]:

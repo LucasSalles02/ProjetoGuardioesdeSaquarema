@@ -12,7 +12,6 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from gds.database import connection
 from gds.import_sqlite import TABLES, canonical
 from gds.service import Service
-from gds.registration import request_registration
 
 
 def test_postgresql_dump_restore_roundtrip(db_url):
@@ -29,9 +28,20 @@ def test_postgresql_dump_restore_roundtrip(db_url):
         service = Service(db)
         service.seed()
         account = service.register({"nome": "Teste Backup", "email": "backup@example.com", "senha": secrets.token_hex(24)})
-        request_registration(service, {"nome": "Pedido Backup", "username": "pedido_backup", "email": "pedido@example.com", "cpf": "00123456789", "birth_date": "01/02/2010"})
+        # Historical requests must remain restorable after public registration is removed.
+        db.execute("INSERT INTO registration_requests (id,nome,username,email,cpf,birth_date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                   (uuid.uuid4().hex, "Pedido Backup", "pedido_backup", "pedido@example.com", "00123456789", "2010-02-01", "2026-01-01T00:00:00Z"))
         db.execute("UPDATE stats SET xp=725 WHERE user_id=%s", (account["usuario"]["id"],))
-        expected = {table: canonical(db.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))).fetchall()) for table in [*TABLES, "registration_requests"]}
+        manager = service.register({"nome": "Gestor Backup", "email": "gestorbackup@example.com", "senha": secrets.token_hex(24)})
+        db.execute("UPDATE users SET role='GESTOR_ESCOLAR' WHERE id=%s", (manager["usuario"]["id"],))
+        school = db.execute("INSERT INTO schools(name) VALUES ('Unidade Backup') RETURNING id").fetchone()["id"]
+        db.execute("INSERT INTO school_manager_links(school_id,manager_id,authorized_by) VALUES (%s,%s,%s)", (school,manager["usuario"]["id"],account["usuario"]["id"]))
+        db.execute("UPDATE sessions SET school_id=%s WHERE token=%s", (school, manager["token"]))
+        stage = db.execute("SELECT id FROM school_stages ORDER BY sort_order LIMIT 1").fetchone()["id"]
+        classroom = db.execute("INSERT INTO school_classes(school_id,stage_id,identification) VALUES (%s,%s,'2A') RETURNING id", (school,stage)).fetchone()["id"]
+        db.execute("INSERT INTO student_school_memberships(student_id,school_id,registration_number,class_id) VALUES (%s,%s,'0001',%s)", (account["usuario"]["id"],school,classroom))
+        db.execute("INSERT INTO class_enrollment_events(student_id,school_id,to_class_id,actor_id) VALUES (%s,%s,%s,%s)", (account["usuario"]["id"],school,classroom,manager["usuario"]["id"]))
+        expected = {table: canonical(db.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))).fetchall()) for table in [*TABLES, "registration_requests", "access_profiles", "schools", "school_manager_links", "school_stages", "school_classes", "student_school_memberships", "class_enrollment_events", "school_deactivations"]}
     result = subprocess.run([str(dump), "--format=custom", "--schema", schema], env=env, capture_output=True)
     assert result.returncode == 0, "pg_dump falhou"
     database = "test_restore_" + uuid.uuid4().hex
@@ -44,7 +54,7 @@ def test_postgresql_dump_restore_roundtrip(db_url):
                                 input=result.stdout, env={**env, "PGDATABASE": database}, capture_output=True)
         assert result.returncode == 0, "pg_restore falhou"
         with connection(restored_url) as db:
-            for table in [*TABLES, "registration_requests"]:
+            for table in [*TABLES, "registration_requests", "access_profiles", "schools", "school_manager_links", "school_stages", "school_classes", "student_school_memberships", "class_enrollment_events", "school_deactivations"]:
                 rows = db.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))).fetchall()
                 assert canonical(rows) == expected[table], table
     finally:

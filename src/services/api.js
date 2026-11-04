@@ -15,10 +15,6 @@ function storeSession(payload) {
 }
 
 export const auth = {
-  async cadastrar(dados) {
-    return storeSession(await apiRequest("/auth/register", jsonOptions("POST", dados)));
-  },
-
   async login(credentials) {
     return storeSession(await apiRequest("/auth/login", jsonOptions("POST", credentials)));
   },
@@ -134,7 +130,34 @@ export const jogos = {
   },
 };
 
+export const unidadesEscolares = {
+  async contexto() { return apiRequest("/school-context"); },
+  async selecionar(id) { return apiRequest("/school-context", jsonOptions("POST", { school_id: id })); },
+  async atual() { return apiRequest("/school-current"); },
+  async minhas() { return apiRequest("/school-units"); },
+};
+
+export const gestaoEscolar = {
+  async progressoAluno(id) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/progress`); },
+  async resumoTurma(id) { return apiRequest(`/school-management/classes/${encodeURIComponent(id)}/summary`); },
+  async turmas() { return apiRequest("/school-management/classes"); },
+  async etapas() { return apiRequest("/school-management/stages"); },
+  async alunos() { return apiRequest("/school-management/students"); },
+  async salvarTurma(id, dados) { return apiRequest(id ? `/school-management/classes/${encodeURIComponent(id)}` : "/school-management/classes", jsonOptions(id ? "PATCH" : "POST", dados)); },
+  async vincularAluno(id, classId) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/class`, jsonOptions("PATCH", { class_id: classId })); },
+};
+
 export const admin = {
+  async reativarUnidade(id) { return apiRequest(`/admin/schools/${encodeURIComponent(id)}/reactivate`, jsonOptions("PATCH", { confirm: true })); },
+  async desativarUnidade(id) { return apiRequest(`/admin/schools/${encodeURIComponent(id)}/deactivate`, jsonOptions("PATCH", { confirm: true })); },
+  async listarEtapas() { return apiRequest("/admin/school-stages"); },
+  async salvarEtapa(id, dados) { return apiRequest(id ? `/admin/school-stages/${encodeURIComponent(id)}` : "/admin/school-stages", jsonOptions(id ? "PATCH" : "POST", dados)); },
+  async listarUnidades() { return apiRequest("/admin/schools"); },
+  async listarGestoresUnidades() { return apiRequest("/admin/schools/managers"); },
+  async obterUnidade(id) { return apiRequest(`/admin/schools/${encodeURIComponent(id)}`); },
+  async salvarUnidade(id, dados) { return apiRequest(id ? `/admin/schools/${encodeURIComponent(id)}` : "/admin/schools", jsonOptions(id ? "PATCH" : "POST", dados)); },
+  async listarPerfis() { return apiRequest("/admin/profiles"); },
+  async salvarPerfil(id, dados) { return apiRequest(id ? `/admin/profiles/${encodeURIComponent(id)}` : "/admin/profiles", jsonOptions(id ? "PATCH" : "POST", dados)); },
   async listarUsuarios() { return apiRequest("/admin/users"); },
   async obterUsuario(id) {
     return apiRequest(`/admin/users/${encodeURIComponent(id)}`);
@@ -150,15 +173,6 @@ export const admin = {
   },
   async resetarSenha(id) {
     return apiRequest(`/admin/users/${encodeURIComponent(id)}/reset-password`, jsonOptions("POST"));
-  },
-  async listarSolicitacoes() {
-    return apiRequest("/admin/registration-requests");
-  },
-  async aprovarSolicitacao(id) {
-    return apiRequest(`/admin/registration-requests/${encodeURIComponent(id)}/approve`, jsonOptions("POST"));
-  },
-  async recusarSolicitacao(id, motivo) {
-    return apiRequest(`/admin/registration-requests/${encodeURIComponent(id)}/reject`, jsonOptions("POST", { motivo }));
   },
   async listarConteudo() {
     return apiRequest("/admin/content");

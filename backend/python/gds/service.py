@@ -8,7 +8,7 @@ from pathlib import Path
 
 from psycopg import sql
 
-from . import games
+from . import games, access
 from .errors import ApiError, unauthorized
 from .security import clean, email, hash_password, identifier, profile, token, valid_password, verify_password
 from .time import day, now, previous_day, week
@@ -121,8 +121,13 @@ class Service:
         account = self.one("SELECT * FROM users WHERE id=%s", (user_id,))
         if not account:
             raise unauthorized()
+        if account["role"] == "USER":
+            school = self.one("SELECT s.name,c.identification FROM student_school_memberships m JOIN schools s ON s.id=m.school_id LEFT JOIN school_classes c ON c.id=m.class_id WHERE m.student_id=%s", (user_id,))
+            if school:
+                account = {**account, "escola": school["name"], "turma": school["identification"] or "Aguardando turma"}
+        access_profile = access.effective(self, user_id)
         return {**{key: account[key] for key in ["id", "nome", "email", "turma", "escola", "username", "role", "active", "must_change_password"]},
-                "tipoUsuario": account["role"], "admin": account["role"] == "ADMIN", **self.stats(user_id)}
+                "profile_id": access_profile["id"], "profile_name": access_profile["name"], "permissions": access_profile["permissions"], "tipoUsuario": account["role"], "admin": account["role"] == "ADMIN", **self.stats(user_id)}
 
     def stats(self, user_id):
         self.db.execute("INSERT INTO stats (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,))

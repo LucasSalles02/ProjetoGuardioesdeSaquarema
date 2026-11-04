@@ -33,11 +33,11 @@ export default function AdminUserForm() {
       }
       if (userId === user.id) await refreshUser();
     } else { await admin.cadastrarUsuario(data); }
-    navigate("/admin/dashboard", { replace: true, state: { userManagementMessage: userId ? "Cadastro atualizado." : "Usuário cadastrado. O primeiro acesso será com o CPF e a troca de senha será obrigatória." } });
+    navigate("/admin/usuarios", { replace: true, state: { userManagementMessage: userId ? "Cadastro atualizado." : "Usuário cadastrado. O primeiro acesso será com o CPF e a troca de senha será obrigatória." } });
   }
 
   return <PageShell title={userId ? "Editar usuário" : "Cadastrar usuário"} description="Administração de contas de Guardiões de Saquarema.">
-    <Link to="/admin/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-sky-700"><ArrowLeft size={17} aria-hidden="true" /> Voltar ao painel</Link>
+    <Link to="/admin/usuarios" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-sky-700"><ArrowLeft size={17} aria-hidden="true" /> Voltar aos usuários</Link>
     {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
     {loading ? <p role="status" className="flex items-center gap-2"><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Carregando cadastro...</p> : (!userId || account) && <UserForm key={userId || "new"} onSave={save} initialData={account} ownAccount={userId === user?.id} />}
   </PageShell>;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ClipboardList, Leaf, Loader2, Target, Trophy, Waves } from "lucide-react";
 import PageShell from "../components/PageShell";
 import { missoes as missoesAPI } from "../services/api";
+import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
 
 export default function MissoesDiarias() {
@@ -140,7 +141,7 @@ export default function MissoesDiarias() {
                   <button
                     type="button"
                     onClick={() => handleConcluir(missao.id)}
-                    disabled={missao.concluida || concluindo === missao.id}
+                    disabled={!can(user, "missions.submit") || missao.concluida || concluindo === missao.id}
                     className="inline-flex min-w-36 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-2.5 text-sm font-black text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
                   >
                     {concluindo === missao.id ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : null}

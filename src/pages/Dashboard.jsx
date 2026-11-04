@@ -15,9 +15,16 @@ import {
 import { Link } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import { aprendizado, conquistas, missoes, progresso } from "../services/api";
+import AccessHome from "./AccessHome";
+import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  return ["missions.read", "missions.submit", "learning.read", "learning.complete", "games.read", "games.play", "achievements.read", "progress.read"].every(permission => can(user, permission)) ? <StudentDashboard /> : <AccessHome />;
+}
+
+function StudentDashboard() {
   const { user } = useAuth();
   const [dados, setDados] = useState({
     missoes: [],
