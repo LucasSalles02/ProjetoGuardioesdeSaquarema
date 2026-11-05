@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 from gds.admin import provision_admin
 from gds.app import create_app
 from gds.access import allowed
+from gds.progression import progression
+from gds.service import Service
 from gds.database import connection, migrate
 from gds.import_sqlite import TABLES, import_sqlite
 from gds.security import verify_password
@@ -79,12 +81,28 @@ def test_import_preserves_data_sessions_and_node_contract(db_url, legacy_source,
             if path == "/api/auth/me":
                 expected = {"usuario": {**expected["usuario"], "active": True, "must_change_password": False, "profile_id": "ADMIN", "profile_name": "Administrador", "permissions": sorted(allowed("ADMIN"))}}
             elif path == "/api/admin/users":
-                expected = {"usuarios": [{**row, "active": True, "deactivated_at": None, "cpf": None, "birth_date": None, "must_change_password": False, "profile_id": "ADMIN", "profile_name": "Administrador"} for row in expected["usuarios"]]}
+                expected = {"usuarios": [{**row, "active": True, "deactivated_at": None, "cpf": None, "registration_number": None, "birth_date": None, "must_change_password": False, "profile_id": "ADMIN", "profile_name": "Administrador"} for row in expected["usuarios"]]}
+            # The new rules change derived progression and future rewards, not history.
+            if path == "/api/auth/me":
+                expected["usuario"].update(progression(expected["usuario"]["xp"]))
+            if path in ("/api/progress", "/api/achievements"):
+                with connection(db_url) as db:
+                    catalog = Service(db).achievements(row["id"])
+                expected.update(catalog)
+                if path == "/api/progress":
+                    expected["stats"].update(progression(expected["stats"]["xp"]))
+            if path in ("/api/missions", "/api/admin/content"):
+                for mission in expected["missoes"]:
+                    old_xp = mission["xpRecompensa"]
+                    xp = old_xp if old_xp in (10,20,30) else 10 if old_xp <= 40 else 20 if old_xp <= 60 else 30
+                    mission.update(xpRecompensa=xp, dificuldade={10:"F\u00e1cil",20:"M\u00e9dia",30:"Dif\u00edcil"}[xp])
             response = client.get(path, headers=headers)
             assert response.status_code == 200, path
             assert response.json() == expected, path
-        assert client.post("/api/auth/login", json={"email": "legado@example.com", "senha": "segredo123"}).status_code == 200
-        assert client.post("/api/auth/admin/login", json={"username": "gestor", "senha": "segredo123"}).status_code == 200
+        with connection(db_url) as db:
+            db.execute("UPDATE users SET cpf='00123456789' WHERE id=%s", (row["id"],))
+        assert client.post("/api/auth/login", json={"cpf": "00123456789", "senha": "segredo123"}).status_code == 200
+        assert client.post("/api/auth/admin/login", json={"cpf": "00123456789", "senha": "segredo123"}).status_code == 200
         state = json.loads(session["state_json"])
         second = next(card["id"] for card in state["cards"] if card["id"] not in state["flippedIds"])
         assert client.post(f"/api/games/memory/sessions/{session['id']}/flip", headers=headers, json={"cardId": second}).status_code == 200
@@ -115,7 +133,7 @@ def test_import_rolls_back_on_invalid_record(db_url, legacy_source, tmp_path):
 @pytest.mark.parametrize("prefix", ["GUARDIOES_DE_SAQUAREMA", "ECOMAR"])
 def test_admin_idempotent_reset_and_legacy_env(db_url, monkeypatch, prefix):
     password = secrets.token_hex(24)
-    for key, value in {"ADMIN_USERNAME": "gestor", "ADMIN_PASSWORD": password, "ADMIN_EMAIL": "gestor@example.com"}.items():
+    for key, value in {"ADMIN_CPF": "88123456789", "ADMIN_PASSWORD": password, "ADMIN_EMAIL": "gestor@example.com"}.items():
         monkeypatch.delenv(f"GUARDIOES_DE_SAQUAREMA_{key}", raising=False)
         monkeypatch.delenv(f"ECOMAR_{key}", raising=False)
         monkeypatch.setenv(f"{prefix}_{key}", value)
@@ -124,7 +142,7 @@ def test_admin_idempotent_reset_and_legacy_env(db_url, monkeypatch, prefix):
         provision_admin(db)
         assert db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 1
     with TestClient(create_app(db_url)) as client:
-        response = client.post("/api/auth/admin/login", json={"username": "gestor", "senha": password})
+        response = client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": password})
         assert response.status_code == 200
         bearer = response.json()["token"]
         replacement = secrets.token_hex(24)
@@ -133,8 +151,8 @@ def test_admin_idempotent_reset_and_legacy_env(db_url, monkeypatch, prefix):
             with pytest.raises(Exception, match="painel administrativo"):
                 provision_admin(db, reset=True)
         assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {bearer}"}).status_code == 200
-        assert client.post("/api/auth/admin/login", json={"username": "gestor", "senha": password}).status_code == 200
-        assert client.post("/api/auth/admin/login", json={"username": "gestor", "senha": replacement}).status_code == 401
+        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": password}).status_code == 200
+        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": replacement}).status_code == 401
     result = subprocess.run(["node", "backend/createAdmin.js"], cwd=ROOT,
                             env={**os.environ, "DATABASE_URL": db_url, "GUARDIOES_PYTHON": sys.executable}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -147,13 +165,13 @@ def test_pbkdf2_compatibility(client, account, db_url, password):
     digest = base64.b64encode(hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120000, 32)).decode()
     with connection(db_url) as db:
         db.execute("UPDATE users SET password_salt=%s,password_hash=%s", (salt, digest))
-    assert client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": password}).status_code == 200
+    assert client.post("/api/auth/login", json={"registration_number": "fixture-001", "senha": password}).status_code == 200
 
 
 def test_migrations_idempotent_and_checksum_guard(db_url):
     migrate(db_url)
     with connection(db_url) as db:
-        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 9
+        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 13
         db.execute("UPDATE schema_migrations SET checksum='invalid'")
     with pytest.raises(RuntimeError, match="foi alterada"):
         migrate(db_url)

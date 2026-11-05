@@ -32,3 +32,5 @@ def migrate(url=None):
                 continue
             db.execute(source)
             db.execute("INSERT INTO schema_migrations (version, checksum) VALUES (%s, %s)", (path.name, digest))
+        from .onboarding import upgrade_credentials
+        upgrade_credentials(db)

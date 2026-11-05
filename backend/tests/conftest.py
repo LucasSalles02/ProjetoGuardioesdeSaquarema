@@ -44,7 +44,9 @@ def client(db_url):
 def account(client, db_url):
     # A pre-existing account from before CPF onboarding; legacy access must survive migrations.
     with connection(db_url) as db:
-        return Service(db).register({"nome": "Aluno Teste", "email": "aluno@example.com", "senha": "segredo123", "turma": "7 Ano", "escola": "Escola do Mar"})
+        result = Service(db).register({"nome": "Aluno Teste", "email": "aluno@example.com", "senha": "segredo123", "turma": "7 Ano", "escola": "Escola do Mar"})
+        db.execute("UPDATE users SET registration_number='fixture-001' WHERE id=%s", (result["usuario"]["id"],))
+        return result
 
 
 @pytest.fixture
@@ -55,5 +57,5 @@ def auth_headers(account):
 @pytest.fixture
 def admin_headers(account, db_url):
     with connection(db_url) as db:
-        db.execute("UPDATE users SET role='ADMIN',username='gestor' WHERE id=%s", (account["usuario"]["id"],))
+        db.execute("UPDATE users SET role='ADMIN',username='gestor',cpf='99123456789' WHERE id=%s", (account["usuario"]["id"],))
     return {"Authorization": f"Bearer {account['token']}"}

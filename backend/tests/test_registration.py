@@ -32,7 +32,7 @@ def test_request_moderation_is_removed(client, admin_headers, method, path):
 
 def test_administrator_can_still_create_user(client, admin_headers, db_url):
     data = {"nome": "Aluno Administrado", "username": "aluno.admin", "email": "novo@example.com",
-            "cpf": "01234567890", "birth_date": "01/01/2000", "role": "USER"}
+            "cpf": "01234567890", "birth_date": "01/01/2000", "role": "USER", "registration_number": "00001234"}
     result = client.post("/api/admin/users", headers=admin_headers, json=data)
     assert result.status_code == 200
     user = result.json()["usuario"]
@@ -40,6 +40,6 @@ def test_administrator_can_still_create_user(client, admin_headers, db_url):
     assert user["cpf"] == data["cpf"]
     with connection(db_url) as db:
         assert db.execute("SELECT COUNT(*) AS n FROM registration_requests").fetchone()["n"] == 0
-    login = client.post("/api/auth/login", json={"email": data["email"], "senha": data["cpf"]})
+    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": data["registration_number"]})
     assert login.status_code == 200
     assert login.json()["usuario"]["id"] == user["id"]

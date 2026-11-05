@@ -123,7 +123,7 @@ export default function ModuloAprender() {
         </div>
       </section>
 
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
+      <section className="adaptive-card-grid mb-6 grid gap-4">
         <ModuleDetail title="Objetivo" text={modulo.objetivo} />
         <ModuleDetail title="Pergunta-guia" text={modulo.perguntaGuia} />
         <ModuleDetail title="Ação local" text={modulo.acaoLocal} />
@@ -132,8 +132,8 @@ export default function ModuloAprender() {
       <div className="space-y-3">
         {modulo.lessons.map((lesson) => (
           <article key={lesson.id} className="sea-card rounded-3xl p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-1 basis-64 gap-3">
                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
                   lesson.concluida ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-700"
                 }`}>
@@ -142,7 +142,7 @@ export default function ModuloAprender() {
                 <div>
                   <h3 className="font-black text-slate-950">{lesson.titulo}</h3>
                   <p className="mt-1 text-sm text-slate-600">{lesson.resumo}</p>
-                  <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  <div className="adaptive-card-grid mt-3 grid gap-2">
                     <span className="inline-flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
                       <Sparkles size={14} aria-hidden="true" />
                       {lesson.habilidade}

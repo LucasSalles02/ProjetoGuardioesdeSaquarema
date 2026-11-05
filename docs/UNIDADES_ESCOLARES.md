@@ -62,7 +62,7 @@ A migração `006_school_units.sql` cria as entidades sem modificar as migraçõ
 
 A migração `007_session_school_context.sql` acrescenta `sessions.school_id`. Cada novo login começa sem seleção, mesmo quando o gestor possui uma única unidade. Recarregar a página conserva a seleção da mesma sessão, após nova validação dos vínculos. Logins distintos podem manter unidades ativas diferentes.
 
-Administradores podem selecionar qualquer unidade ao entrar no módulo Gestão, com `institutions.read` e as permissões de ação necessárias. Não é criado um vínculo de gestor para o administrador. Gestores continuam vendo somente as unidades autorizadas; alunos não podem selecionar contexto escolar. A seleção administrativa é opcional fora da Gestão e também pode ser trocada pelo perfil flutuante.
+Administradores podem selecionar qualquer unidade ao entrar no módulo Gestão, com `institutions.read` e as permissões de consulta necessárias. Nesse módulo, o acesso administrativo é somente de leitura; alterações de turmas e vínculos de turma são exclusivas dos gestores. Não é criado um vínculo de gestor para o administrador. Gestores continuam vendo somente as unidades autorizadas; alunos não podem selecionar contexto escolar. A seleção administrativa é opcional fora da Gestão e também pode ser trocada pelo perfil flutuante.
 
 A tela `/selecionar-unidade` permite escolher apenas unidades autorizadas, atualizar a lista e sair. Sem unidades ou sem permissão, o gestor permanece nessa etapa com a orientação de procurar a administração. A troca também está disponível no perfil flutuante, que exibe o nome da unidade aberta. Trocar a unidade retorna ao início e recria o conteúdo da área para descartar dados e formulários anteriores.
 

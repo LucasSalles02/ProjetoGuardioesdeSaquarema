@@ -89,7 +89,7 @@ def test_role_change_and_deactivation_revoke_authorization(client, admin_headers
     manager, headers = actor(db_url, "GESTOR_ESCOLAR", "manager")
     second, _ = actor(db_url, "GESTOR_ESCOLAR", "second")
     unit = create_school(client, admin_headers, managers=[manager, second]).json()["unidade"]
-    result = client.patch(f"/api/admin/users/{manager}", headers=admin_headers, json={"nome": "Ex Gestor", "username": "exgestor", "email": "manager@example.com", "cpf": "01234567890", "birth_date": "01/01/2000", "role": "USER"})
+    result = client.patch(f"/api/admin/users/{manager}", headers=admin_headers, json={"nome": "Ex Gestor", "username": "exgestor", "email": "manager@example.com", "cpf": "01234567890", "birth_date": "01/01/2000", "role": "USER", "registration_number": "000exgestor"})
     assert result.status_code == 200, result.text
     assert client.get("/api/school-units", headers=headers).status_code == 401
     assert client.patch(f"/api/admin/users/{second}/deactivate", headers=admin_headers).status_code == 200

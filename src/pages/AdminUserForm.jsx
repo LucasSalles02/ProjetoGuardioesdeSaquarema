@@ -26,14 +26,14 @@ export default function AdminUserForm() {
     if (userId) {
       await admin.editarUsuario(userId, data);
       // Identity edits revoke sessions, including the administrator's own session.
-      if (userId === user.id && (data.cpf !== account.cpf || data.email !== account.email || data.username.toLowerCase() !== account.username)) {
+      if (userId === user.id && (data.cpf !== account.cpf || data.email !== account.email)) {
         await logout();
         navigate("/admin/login", { replace: true });
         return;
       }
       if (userId === user.id) await refreshUser();
     } else { await admin.cadastrarUsuario(data); }
-    navigate("/admin/usuarios", { replace: true, state: { userManagementMessage: userId ? "Cadastro atualizado." : "Usuário cadastrado. O primeiro acesso será com o CPF e a troca de senha será obrigatória." } });
+    navigate("/admin/usuarios", { replace: true, state: { userManagementMessage: userId ? "Cadastro atualizado." : data.role === "USER" ? "Aluno cadastrado. Use a matrícula no login e também como senha inicial. A troca de senha será obrigatória." : "Profissional cadastrado. Use o CPF no login e também como senha inicial. A troca será obrigatória." } });
   }
 
   return <PageShell title={userId ? "Editar usuário" : "Cadastrar usuário"} description="Administração de contas de Guardiões de Saquarema.">

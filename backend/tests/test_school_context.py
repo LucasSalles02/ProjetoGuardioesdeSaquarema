@@ -8,7 +8,7 @@ from gds.service import Service
 def manager_context(client, admin_headers, db_url):
     with connection(db_url) as db:
         manager = Service(db).register({"nome": "Gestor Contexto", "email": "contexto@example.com", "senha": "segredo123"})
-        db.execute("UPDATE users SET role='GESTOR_ESCOLAR' WHERE id=%s", (manager["usuario"]["id"],))
+        db.execute("UPDATE users SET role='GESTOR_ESCOLAR',cpf='88123456789' WHERE id=%s", (manager["usuario"]["id"],))
     units = []
     for name in ["Escola Azul", "Escola Verde", "Escola Alheia"]:
         result = client.post("/api/admin/schools", headers=admin_headers, json={"name": name, "manager_ids": [manager["usuario"]["id"]] if name != "Escola Alheia" else []})
@@ -72,7 +72,7 @@ def test_revocation_clears_selection_and_requires_new_choice(client, admin_heade
 def test_session_selection_is_independent_and_new_login_requires_choice(client, manager_context, db_url):
     manager, headers, units = manager_context
     client.post("/api/school-context", headers=headers, json={"school_id": units[0]["id"]})
-    login = client.post("/api/auth/login", json={"email": "contexto@example.com", "senha": "segredo123"})
+    login = client.post("/api/auth/login", json={"cpf": "88123456789", "senha": "segredo123"})
     other_headers = {"Authorization": "Bearer " + login.json()["token"]}
     assert client.get("/api/school-context", headers=other_headers).json()["unidade"] is None
     client.post("/api/school-context", headers=other_headers, json={"school_id": units[1]["id"]})
@@ -90,7 +90,7 @@ def test_students_and_anonymous_cannot_set_context(client, auth_headers):
 
 
 def test_admin_can_choose_any_unit_without_manager_link(client, admin_headers, manager_context):
-    _, manager_headers, units = manager_context
+    manager_id, manager_headers, units = manager_context
     result = client.get("/api/school-context", headers=admin_headers)
     assert result.status_code == 200
     assert {unit["id"] for unit in result.json()["unidades"]} == {unit["id"] for unit in units}
@@ -101,23 +101,29 @@ def test_admin_can_choose_any_unit_without_manager_link(client, admin_headers, m
     assert client.post("/api/school-context", headers=admin_headers, json={"school_id": foreign["id"]}).status_code == 200
     assert client.get("/api/school-current", headers=admin_headers).json()["unidade"]["id"] == foreign["id"]
     stage = client.get("/api/school-management/stages", headers=admin_headers).json()["etapas"][0]
-    created = client.post("/api/school-management/classes", headers=admin_headers, json={"identification": "Admin A", "stage_id": stage["id"]})
+    assert client.post("/api/school-management/classes", headers=admin_headers, json={"identification": "Bloqueada", "stage_id": stage["id"]}).status_code == 403
+    assert client.patch(f"/api/admin/schools/{foreign['id']}", headers=admin_headers, json={"name": foreign["name"], "manager_ids": [manager_id]}).status_code == 200
+    assert client.post("/api/school-context", headers=manager_headers, json={"school_id": foreign["id"]}).status_code == 200
+    created = client.post("/api/school-management/classes", headers=manager_headers, json={"identification": "Gestor A", "stage_id": stage["id"]})
     assert created.status_code == 200, created.text
     classroom = created.json()["turma"]
     assert classroom["school_id"] == foreign["id"]
-    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=admin_headers, json={"identification": "Admin B", "stage_id": stage["id"]}).status_code == 200
+    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=admin_headers, json={"identification": "Admin B", "stage_id": stage["id"]}).status_code == 403
+    assert client.get("/api/school-management/classes", headers=admin_headers).json()["turmas"][0]["id"] == classroom["id"]
+    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=manager_headers, json={"identification": "Gestor B", "stage_id": stage["id"]}).status_code == 200
     student = client.post("/api/admin/users", headers=admin_headers, json={"nome": "Aluno da Unidade", "username": "aluno.unidade", "email": "alunounidade@example.com", "cpf": "00123456789", "birth_date": "01/01/2015", "role": "USER", "school_id": foreign["id"], "registration_number": "0001"})
     assert student.status_code == 200, student.text
     student_id = student.json()["usuario"]["id"]
     assert client.get("/api/school-management/students", headers=admin_headers).json()["alunos"][0]["id"] == student_id
-    assert client.patch(f"/api/school-management/students/{student_id}/class", headers=admin_headers, json={"class_id": classroom["id"]}).status_code == 200
+    assert client.patch(f"/api/school-management/students/{student_id}/class", headers=admin_headers, json={"class_id": classroom["id"]}).status_code == 403
+    assert client.patch(f"/api/school-management/students/{student_id}/class", headers=manager_headers, json={"class_id": classroom["id"]}).status_code == 200
     assert client.post("/api/school-context", headers=admin_headers, json={"school_id": units[0]["id"]}).status_code == 200
     assert client.get("/api/school-management/classes", headers=admin_headers).json()["turmas"] == []
     assert client.get("/api/school-management/students", headers=admin_headers).json()["alunos"] == []
     stale = client.get("/api/school-management/classes", headers={**admin_headers, "X-School-Id": str(foreign["id"])})
     assert stale.status_code == 409 and stale.json()["codigo"] == "UNIDADE_DESATUALIZADA"
-    assert client.patch(f"/api/school-management/students/{student_id}/class", headers=admin_headers, json={"class_id": classroom["id"]}).status_code == 404
-    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=admin_headers, json={"identification": "Outra Unidade", "stage_id": stage["id"]}).status_code == 404
+    assert client.patch(f"/api/school-management/students/{student_id}/class", headers=admin_headers, json={"class_id": classroom["id"]}).status_code == 403
+    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=admin_headers, json={"identification": "Outra Unidade", "stage_id": stage["id"]}).status_code == 403
     assert client.get(f"/api/school-management/classes/{classroom['id']}/summary", headers=admin_headers).status_code == 404
 
 
@@ -136,3 +142,19 @@ def test_admin_school_context_respects_custom_permissions(client, admin_headers,
         db.execute("UPDATE access_profiles SET permissions='[\"classes.read\"]'::jsonb WHERE id=%s", (profile["id"],))
     assert client.get("/api/school-context", headers=headers).status_code == 403
     assert client.get("/api/school-management/classes", headers=headers).status_code == 403
+
+
+def test_admin_cannot_write_even_with_obsolete_grants_in_database(client, admin_headers, manager_context, db_url):
+    _, manager_headers, units = manager_context
+    assert client.post("/api/school-context", headers=manager_headers, json={"school_id": units[0]["id"]}).status_code == 200
+    stage = client.get("/api/school-management/stages", headers=manager_headers).json()["etapas"][0]
+    classroom = client.post("/api/school-management/classes", headers=manager_headers, json={"identification": "Consulta protegida", "stage_id": stage["id"]}).json()["turma"]
+    client.post("/api/school-context", headers=admin_headers, json={"school_id": units[0]["id"]})
+    with connection(db_url) as db:
+        db.execute("UPDATE access_profiles SET permissions=permissions || '[\"classes.create\",\"classes.update\",\"enrollments.update\"]'::jsonb WHERE id='ADMIN'")
+    grants = client.get("/api/auth/me", headers=admin_headers).json()["usuario"]["permissions"]
+    assert not {"classes.create", "classes.update", "enrollments.update"} & set(grants)
+    assert client.get("/api/school-management/classes", headers=admin_headers).status_code == 200
+    assert client.post("/api/school-management/classes", headers=admin_headers, json={"identification": "Bloqueada", "stage_id": stage["id"]}).status_code == 403
+    assert client.patch(f"/api/school-management/classes/{classroom['id']}", headers=admin_headers, json={"identification": "Bloqueada", "stage_id": stage["id"]}).status_code == 403
+    assert client.patch("/api/school-management/students/missing/class", headers=admin_headers, json={"class_id": classroom["id"]}).status_code == 403

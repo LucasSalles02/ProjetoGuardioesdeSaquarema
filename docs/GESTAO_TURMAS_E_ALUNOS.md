@@ -2,14 +2,14 @@
 
 Gestores acessam Gestão → Gestão de Turmas e Alunos na unidade ativa. A seleção inicial de unidade usa uma janela compacta sobre a estrutura do sistema, com fundo desfocado e bloqueado. Nenhum dado escolar é carregado antes da seleção; a troca pelo perfil descarta os formulários e consultas anteriores.
 
-Administradores também acessam Gestão pela navegação ou pelo painel administrativo. Ao abrir o módulo, escolhem qualquer unidade cadastrada, sem necessidade de vínculo de gestor. As operações sobre turmas e alunos continuam restritas à unidade ativa e às permissões `classes.*`, `enrollments.*` e `school_progress.*`; selecionar uma unidade não concede ações ausentes no perfil. A seleção administrativa exige `institutions.read`. A administração geral de contas e conteúdos continua global e não exige selecionar uma escola.
+Administradores também acessam Gestão pela navegação ou pelo painel administrativo. Ao abrir o módulo, escolhem qualquer unidade cadastrada, sem necessidade de vínculo de gestor, exclusivamente para consultar turmas, alunos e indicadores. Cadastrar/editar turmas e vincular/transferir alunos entre turmas são ações exclusivas do Gestor Escolar, mesmo que permissões antigas ainda existam no banco ou no navegador. As consultas continuam restritas à unidade ativa e às permissões de leitura; selecionar uma unidade não concede ações ausentes no perfil. A seleção administrativa exige `institutions.read`. A administração geral de contas e conteúdos continua global e não exige selecionar uma escola.
 
 O menu lateral do perfil Gestão Escolar apresenta somente **Início → Gestão → Conta**, respeitando as permissões de gerenciamento.
 
 ## Fluxo de cadastro e organização
 
 1. O administrador cadastra e autoriza gestores em Unidades Escolares.
-2. Em Gerenciar Usuários e Perfis, o administrador cria a conta de Aluno, escolhe sua unidade e informa a matrícula. A matrícula preserva zeros à esquerda e é única na unidade.
+2. Em Gerenciar Usuários e Perfis, o administrador cria a conta de Aluno, escolhe sua unidade e informa a matrícula. A matrícula preserva zeros à esquerda e é única na plataforma para permitir login sem ambiguidade.
 3. Em Etapas Escolares, ao lado de Perfis de acesso, o administrador mantém o catálogo de etapas. Os padrões são 2º, 3º, 4º, 5º e 6º ano. Uma etapa inativa deixa de ser oferecida a novas turmas, preservando as turmas existentes.
 4. O gestor seleciona a unidade, cadastra a turma com identificação e etapa e vincula os alunos já cadastrados nessa escola.
 5. Transferir um aluno substitui a turma anterior na mesma unidade. Somente a administração pode transferir o vínculo institucional para outra unidade; nesse caso, o aluno aguarda a definição da turma na unidade de destino.
@@ -28,7 +28,7 @@ Contas antigas e contas ainda sem alocação escolar não recebem vínculos infe
 | RN09/RN11 | Missões e administração geral continuam exclusivas da administração |
 | RF20, RN02/RN14 | Permissão de ação, vínculo autorizado e unidade da sessão verificados no servidor, inclusive com IDs e parâmetros adulterados |
 
-O cadastro de turma corresponde a `Turma.id` e `Turma.identificacao` do diagrama, acrescido da etapa solicitada pelo usuário. `Aluno.matricula` é mantida no vínculo escolar. Não foram acrescentadas alterações à curva global de XP nesta entrega: a consulta exibe os valores e níveis utilizados atualmente pela plataforma.
+O cadastro de turma corresponde a `Turma.id` e `Turma.identificacao` do diagrama, acrescido da etapa solicitada pelo usuário. `Aluno.matricula` é mantida no cadastro da conta e no vínculo escolar, com sincronização nas edições administrativas. Não foram acrescentadas alterações à curva global de XP nesta entrega: a consulta exibe os valores e níveis utilizados atualmente pela plataforma.
 
 ## Integridade e preservação
 
@@ -48,3 +48,7 @@ A visualização administrativa de usuários lista os vínculos institucionais r
 - `GET /api/school-management/classes/{id}/summary`: consolidado de turma, com `school_progress.reports`.
 
 Os endpoints do gestor exigem contexto escolar validado. O corpo de cadastro de turma não aceita `school_id`; o vínculo de aluno aceita somente `class_id`. O administrador atribui `school_id` e `registration_number` pelo cadastro/edição de usuário, exigindo a permissão de vínculos institucionais.
+
+A migração `010_admin_classes_read_only.sql` retira `classes.create`, `classes.update` e `enrollments.update` de todos os perfis com base Administrador. O catálogo, a API de sessão e os formulários não oferecem essas ações ao administrador. A administração continua podendo criar e atribuir perfis de Gestor com essas permissões, sem poder executá-las. O cadastro administrativo de contas, vínculos institucionais e etapas permanece separado da organização de turmas.
+
+Desde a migração 012, a matrícula do aluno permanece na conta quando uma unidade é desativada, permitindo o reset sem recriar vínculo institucional. Consulte [as regras de cadastro e autenticação](CADASTRO_E_AUTENTICACAO.md).

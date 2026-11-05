@@ -30,7 +30,7 @@ export default function Aprender() {
       description="Trilhas curtas com objetivo pedagógico, pergunta-guia e ação local para aplicar na escola ou na cidade."
     >
       <section className="mb-6 rounded-3xl border border-emerald-100 bg-white/80 p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="adaptive-metric-grid grid gap-4">
           <InfoBlock icon={Compass} title="Investigar" text="Entenda o problema ambiental antes de agir." />
           <InfoBlock icon={Lightbulb} title="Aprender" text="Conecte conceitos de ciência, território e cidadania." />
           <InfoBlock icon={MapPin} title="Aplicar" text="Transforme a aula em uma atitude local." />
@@ -38,13 +38,13 @@ export default function Aprender() {
       </section>
 
       {carregando ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="adaptive-card-grid grid gap-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="h-56 animate-pulse rounded-3xl bg-white/70" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="adaptive-card-grid grid gap-4">
           {modulos.map((modulo) => {
             const completo = modulo.percentual === 100;
 

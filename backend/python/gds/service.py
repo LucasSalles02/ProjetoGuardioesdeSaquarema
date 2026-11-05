@@ -9,12 +9,14 @@ from pathlib import Path
 from psycopg import sql
 
 from . import games, access
+from .progression import progression
 from .errors import ApiError, unauthorized
 from .security import clean, email, hash_password, identifier, profile, token, valid_password, verify_password
 from .time import day, now, previous_day, week
 from .validation import mission_validation, validate_mission, validate_text
 from . import user_management
-from .identity import cpf_digits, matches_cpf
+from .identity import cpf_digits
+from .onboarding import matches_initial
 
 SEED = json.loads((Path(__file__).parent / "data" / "seed.json").read_text(encoding="utf-8"))
 
@@ -73,18 +75,27 @@ class Service:
         return {"usuario": self.user(user_id), "token": self.create_session(user_id)}
 
     def login(self, data, admin=False):
-        identity = data.get("cpf") or data.get("username" if admin else "email", "")
-        try:
-            cpf = cpf_digits(identity)
-        except ApiError:
-            cpf = None
-        account = self.one("SELECT * FROM users WHERE " + ("cpf=%s" if cpf else "username=%s" if admin else "email=%s") + " FOR UPDATE",
-                           (cpf or (str(identity).strip().lower() if admin else email(identity)),))
+        account = None
+        number, raw_cpf = data.get("registration_number"), data.get("cpf")
+        if number is not None and raw_cpf is None and not admin:
+            if isinstance(number, str) and number.strip():
+                candidates = self.all("SELECT * FROM users WHERE role='USER' AND registration_number=%s FOR UPDATE", (number.strip(),))
+                account = candidates[0] if len(candidates) == 1 else None
+        elif raw_cpf is not None and number is None:
+            try:
+                cpf = cpf_digits(raw_cpf)
+            except ApiError:
+                cpf = None
+            if cpf:
+                account = self.one("SELECT * FROM users WHERE role<>'USER' AND cpf=%s" + (" AND role='ADMIN'" if admin else "") + " FOR UPDATE", (cpf,))
         candidate = data.get("senha")
-        if account and account["must_change_password"] and matches_cpf(candidate, account["cpf"]):
-            candidate = account["cpf"]
-        if not account or not account["active"] or (admin and account["role"] != "ADMIN") or not verify_password(candidate, account["password_salt"], account["password_hash"]):
-            raise ApiError("Usuario/email ou senha invalidos.", 401)
+        if account and account["must_change_password"]:
+            if account["role"] == "USER" and not account["registration_number"]:
+                account = None
+            elif matches_initial(candidate, account):
+                candidate = account["registration_number"] if account["role"] == "USER" else account["cpf"]
+        if not account or not account["active"] or not verify_password(candidate, account["password_salt"], account["password_hash"]):
+            raise ApiError("Identificacao ou senha invalidos.", 401)
         return {"usuario": self.user(account["id"]), "token": self.create_session(account["id"])}
 
     def create_session(self, user_id):
@@ -133,10 +144,7 @@ class Service:
         self.db.execute("INSERT INTO stats (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,))
         row = self.one("SELECT * FROM stats WHERE user_id=%s", (user_id,))
         xp = max(0, row["xp"])
-        # Existing rule intentionally retained; EV02 changes progression separately.
-        level = xp // 500 + 1
-        return {"xp": xp, "nivel": level, "xpProximoNivel": level * 500,
-                "percentualNivel": min(100, math.floor(xp / (level * 500) * 100 + .5)),
+        return {"xp": xp, **progression(xp),
                 "missoesConcluidas": row["missoes_concluidas"], "aulasConcluidas": row["aulas_concluidas"],
                 "jogosConcluidos": row["jogos_concluidos"], "sequenciaDias": row["sequencia_dias"], "lastActiveDate": row["last_active_date"]}
 
@@ -147,8 +155,8 @@ class Service:
         if not valid_password(data.get("novaSenha")):
             raise ApiError("A nova senha precisa ter entre 8 e 256 caracteres.")
         current = self.one("SELECT * FROM users WHERE id=%s", (user_id,))
-        if matches_cpf(data.get("novaSenha"), current["cpf"]):
-            raise ApiError("Escolha uma senha diferente do CPF.")
+        if matches_initial(data.get("novaSenha"), current):
+            raise ApiError("Escolha uma senha diferente da matricula." if current["role"] == "USER" else "Escolha uma senha diferente do CPF.")
         if not verify_password(data.get("senhaAtual"), current["password_salt"], current["password_hash"]):
             raise ApiError("Nao foi possivel alterar a senha.")
         salt = token()
@@ -167,8 +175,8 @@ class Service:
             raise ApiError(f"A nova senha precisa ter entre {minimum} e 256 caracteres.")
         if password != data.get("confirmarSenha"):
             raise ApiError("A confirmacao da senha nao confere.")
-        if matches_cpf(password, current["cpf"]):
-            raise ApiError("Escolha uma senha diferente do CPF.")
+        if matches_initial(password, current):
+            raise ApiError("Escolha uma senha diferente da matricula." if current["role"] == "USER" else "Escolha uma senha diferente do CPF.")
         salt, stamp = token(), now()
         self.db.execute("UPDATE users SET password_salt=%s,password_hash=%s,must_change_password=FALSE,updated_at=%s WHERE id=%s",
                         (salt, hash_password(password, salt), stamp, user_id))
@@ -184,7 +192,7 @@ class Service:
     @staticmethod
     def public_mission(row):
         return {**{key: row[key] for key in ["id", "titulo", "descricao", "aprendizado", "impacto", "categoria"]},
-                "xpRecompensa": row["xp_recompensa"], "validationType": row["validation_type"], "active": bool(row["active"])}
+                "dificuldade": {10: "Fácil", 20: "Média", 30: "Difícil"}[row["xp_recompensa"]], "xpRecompensa": row["xp_recompensa"], "validationType": row["validation_type"], "active": bool(row["active"])}
 
     def list_missions(self, user_id):
         done = {row["mission_id"] for row in self.all("SELECT mission_id FROM mission_submissions WHERE user_id=%s AND date_key=%s", (user_id, day()))}
@@ -246,8 +254,12 @@ class Service:
         return {**reward, **self.get_module(user_id, module_id)}
 
     def achievements(self, user_id):
-        awarded = {row["achievement_id"] for row in self.all("SELECT achievement_id FROM achievement_awards WHERE user_id=%s", (user_id,))}
-        return {"conquistas": [{**item, "obtida": item["id"] in awarded} for item in SEED["achievements"]]}
+        level = self.stats(user_id)["nivel"]
+        preview = self.one("SELECT role FROM users WHERE id=%s", (user_id,))["role"] == "ADMIN"
+        return {"visualizacaoAdmin": preview, "conquistas": [
+            {**item, "obtida": not preview and level >= item["nivelNecessario"],
+             "disponivel": preview or level >= item["nivelNecessario"]}
+            for item in SEED["achievements"]]}
 
     def progress(self, user_id):
         return {"stats": self.stats(user_id), **self.achievements(user_id)}
@@ -278,22 +290,15 @@ class Service:
                         (identifier("act"), user_id, kind, clean(description, 160), amount, now()))
 
     def unlock(self, user_id):
-        unlocked = []
-        while True:
-            stats = self.stats(user_id)
-            marine = next((row for row in self.list_modules(user_id)["modulos"] if row["id"] == "vida-marinha"), {})
-            conditions = {"primeira-missao": stats["missoesConcluidas"] >= 1, "guardiao-do-mar": stats["missoesConcluidas"] >= 10,
-                          "sequencia-tres": stats["sequenciaDias"] >= 3, "vida-marinha": marine.get("percentual") == 100,
-                          "mil-xp": stats["xp"] >= 1000, "nivel-cinco": stats["nivel"] >= 5}
-            awarded = {row["achievement_id"] for row in self.all("SELECT achievement_id FROM achievement_awards WHERE user_id=%s", (user_id,))}
-            pending = [item for item in SEED["achievements"] if conditions.get(item["id"]) and item["id"] not in awarded]
-            if not pending:
-                return unlocked
-            for item in pending:
-                self.db.execute("INSERT INTO achievement_awards (id,user_id,achievement_id,xp_awarded,created_at) VALUES (%s,%s,%s,%s,%s)",
-                                (identifier("ach"), user_id, item["id"], item["xp"], now()))
-                self.grant(user_id, item["xp"], "conquista", f"Conquista: {item['titulo']}")
-                unlocked.append({**item, "obtida": True})
+        if self.one("SELECT role FROM users WHERE id=%s", (user_id,))["role"] != "USER":
+            return []
+        level = self.stats(user_id)["nivel"]
+        awarded = {row["achievement_id"] for row in self.all("SELECT achievement_id FROM achievement_awards WHERE user_id=%s", (user_id,))}
+        pending = [item for item in SEED["achievements"] if level >= item["nivelNecessario"] and item["id"] not in awarded]
+        for item in pending:
+            self.db.execute("INSERT INTO achievement_awards (id,user_id,achievement_id,xp_awarded,created_at) VALUES (%s,%s,%s,0,%s)",
+                            (identifier("ach"), user_id, item["id"], now()))
+        return [{**item, "obtida": True} for item in pending]
 
     def reward(self, user_id, amount, kind, description, counters=None):
         before = self.stats(user_id)
@@ -382,9 +387,11 @@ class Service:
         else:
             record["descricao"] = text("descricao", 300 if kind == "game" else 500)
             if kind in ["mission", "game"]:
-                default_xp = (games.MEMORY_XP if item_id == "memory" else games.PUZZLE_XP) if kind == "game" else 40
+                default_xp = (games.MEMORY_XP if item_id == "memory" else games.PUZZLE_XP) if kind == "game" else 10
                 record["xp_recompensa"] = content_number(value("xp_recompensa", default_xp, "xpRecompensa"))
             if kind == "mission":
+                if float(value("xp_recompensa", 10, "xpRecompensa")) not in (10, 20, 30):
+                    raise ApiError("Missoes devem conceder 10 XP (facil), 20 XP (media) ou 30 XP (dificil).")
                 validation_type = data.get("validationType") or data.get("validation_type")
                 record.update({"aprendizado": text("aprendizado", 120, "Acao ambiental"), "impacto": text("impacto", 500, "Impacto ambiental positivo."),
                     "categoria": text("categoria", 80, "Geral"), "validation_type": validation_type if validation_type in ["text", "list"] else current.get("validation_type", "text")})

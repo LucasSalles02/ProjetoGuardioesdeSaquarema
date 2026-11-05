@@ -12,7 +12,7 @@ const emptyMission = {
   aprendizado: "",
   impacto: "",
   categoria: "Geral",
-  xpRecompensa: 40,
+  xpRecompensa: 10,
   validationType: "text",
   active: true,
 };
@@ -279,9 +279,9 @@ export default function GestaoConteudo() {
 
 function ContentGrid({ form, items }) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+    <div className="adaptive-wide-grid grid items-start gap-6">
       {form}
-      <div className="grid content-start gap-3 md:grid-cols-2">
+      <div className="adaptive-card-grid grid content-start gap-3">
         {items}
       </div>
     </div>
@@ -308,7 +308,7 @@ function ContentItem({ title, meta, active, onEdit }) {
     <article className="rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-base font-black text-blue-950">{title}</h2>
+          <h2 className="break-words text-base font-black text-blue-950">{title}</h2>
           <p className="mt-1 text-sm font-semibold text-slate-600">{meta}</p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-black ${active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
@@ -392,7 +392,7 @@ function MissionForm({ value, editing, saving, onChange, onSubmit, onNew }) {
       <Field label="Impacto"><TextArea rows={3} value={value.impacto} onChange={(event) => onChange({ ...value, impacto: event.target.value })} required /></Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Categoria"><Input value={value.categoria} onChange={(event) => onChange({ ...value, categoria: event.target.value })} required /></Field>
-        <Field label="XP"><Input type="number" min="5" max="500" value={value.xpRecompensa} onChange={(event) => onChange({ ...value, xpRecompensa: event.target.value })} required /></Field>
+        <Field label="Dificuldade e XP"><select value={value.xpRecompensa} onChange={(event) => onChange({ ...value, xpRecompensa: Number(event.target.value) })} className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5" required><option value={10}>Fácil - 10 XP</option><option value={20}>Média - 20 XP</option><option value={30}>Difícil - 30 XP</option></select></Field>
       </div>
       <Field label="Validacao">
         <select value={value.validationType} onChange={(event) => onChange({ ...value, validationType: event.target.value })} className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-sky-600 focus:ring-4 focus:ring-sky-100">

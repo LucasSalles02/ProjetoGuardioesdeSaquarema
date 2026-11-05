@@ -10,7 +10,7 @@ from gds.service import Service
 def school_setup(client, admin_headers, db_url):
     with connection(db_url) as db:
         manager = Service(db).register({"nome": "Gestor Turmas", "email": "gestorturmas@example.com", "senha": "segredo123"})
-        db.execute("UPDATE users SET role='GESTOR_ESCOLAR' WHERE id=%s", (manager["usuario"]["id"],))
+        db.execute("UPDATE users SET role='GESTOR_ESCOLAR',cpf='88123456789' WHERE id=%s", (manager["usuario"]["id"],))
     units = [client.post("/api/admin/schools", headers=admin_headers, json={"name": name, "manager_ids": [manager["usuario"]["id"]]}).json()["unidade"] for name in ["Escola Um", "Escola Dois"]]
     headers = {"Authorization": "Bearer " + manager["token"]}
     assert client.post("/api/school-context", headers=headers, json={"school_id": units[0]["id"]}).status_code == 200
@@ -82,6 +82,8 @@ def test_membership_single_class_and_progress_preserved(client, admin_headers, s
         assert current_user["escola"] == "Escola Um" and current_user["turma"] == "Turma B"
     report = client.get(f"/api/school-management/students/{account['id']}/progress", headers=headers)
     assert report.status_code == 200 and report.json()["progresso"]["xp"] == 725
+    assert report.json()["progresso"]["level"] == 7
+    assert len(report.json()["progresso"]["achievements"]) == 7
     summary = client.get(f"/api/school-management/classes/{b['id']}/summary", headers=headers).json()["resumo"]
     assert summary["student_count"] == 1 and summary["total_xp"] == 725 and summary["average_xp"] == 725
     assert client.patch(path, headers=headers, json={"class_id": a["id"], "xp": 0}).status_code == 400
@@ -141,7 +143,7 @@ def test_concurrent_assignments_preserve_one_class(client, admin_headers, school
 
 def test_no_implicit_membership_from_school_text_or_public_registration(client, admin_headers, school_setup):
     setup, headers = school_setup, school_setup["headers"]
-    account = student(client, admin_headers, None, escola="Escola Um", registration_number="").json()["usuario"]
+    account = student(client, admin_headers, None, escola="Escola Um", registration_number="000one").json()["usuario"]
     assert account["linked_schools"] == []
     assert client.get("/api/school-management/students", headers=headers).json()["alunos"] == []
     assert client.post("/api/admin/users", headers=headers, json={}).status_code == 403
@@ -156,5 +158,5 @@ def test_missing_scope_and_read_only_profile_are_enforced(client, admin_headers,
     assert client.get("/api/school-management/classes", headers=headers).status_code == 200
     assert classroom(client, setup).status_code == 403
     assert client.patch("/api/school-management/students/missing/class", headers=headers, json={"class_id": 1}).status_code == 403
-    new_session = client.post("/api/auth/login", json={"email": "gestorturmas@example.com", "senha": "segredo123"}).json()["token"]
+    new_session = client.post("/api/auth/login", json={"cpf": "88123456789", "senha": "segredo123"}).json()["token"]
     assert client.get("/api/school-management/classes", headers={"Authorization": "Bearer " + new_session}).status_code == 409

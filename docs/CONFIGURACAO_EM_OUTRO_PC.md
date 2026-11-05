@@ -61,7 +61,7 @@ npm.cmd run db:stop
 
 ## 4. Escolher entre banco novo e dados existentes
 
-Os passos anteriores preparam um banco novo. As migrações `001` a `009` criam também os perfis padrão Administrador, Gestão Escolar e Aluno e as etapas do 2º ao 6º ano. Unidades, turmas, alunos, gestores, vínculos e progresso reais não acompanham o Git e precisam ser cadastrados ou restaurados.
+Os passos anteriores preparam um banco novo. As migrações `001` a `013` criam também os perfis padrão Administrador, Gestão Escolar e Aluno e as etapas do 2º ao 6º ano. Unidades, turmas, alunos, gestores, vínculos e progresso reais não acompanham o Git e precisam ser cadastrados ou restaurados.
 
 Para continuar com os dados do computador anterior, faça um backup do PostgreSQL ativo com `pg_dump` e restaure com `pg_restore` em uma base dedicada e vazia, antes de provisionar o administrador e iniciar a aplicação. Preserve uma cópia do backup e confira a restauração. Transfira o arquivo por um meio privado, sem publicá-lo no GitHub. Use as credenciais locais de cada ambiente, sem colocá-las em argumentos de terminal ou logs.
 
@@ -74,13 +74,13 @@ As instruções de operação e validação do banco estão em [backend/README.m
 Preencha estas variáveis no `.env`, com valores próprios:
 
 ```dotenv
-GUARDIOES_DE_SAQUAREMA_ADMIN_USERNAME='seu_usuario_admin'
+GUARDIOES_DE_SAQUAREMA_ADMIN_CPF='SEU_CPF_COM_11_DIGITOS'
 GUARDIOES_DE_SAQUAREMA_ADMIN_PASSWORD='SUBSTITUA_POR_UMA_SENHA_PROPRIA'
 GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL='seu_email@example.com'
 GUARDIOES_DE_SAQUAREMA_ADMIN_NAME='Seu nome'
 ```
 
-A senha administrativa exige de 12 a 256 caracteres. O nome de usuário aceita de 3 a 40 letras minúsculas, números, ponto, hífen e sublinhado. O email deve ser exclusivo.
+A senha administrativa exige de 12 a 256 caracteres. O CPF deve conter 11 dígitos, preservando zeros à esquerda. O email deve ser exclusivo.
 
 ```powershell
 npm.cmd run admin:create
@@ -88,7 +88,7 @@ npm.cmd run admin:create
 
 Remova as credenciais administrativas do `.env` após o provisionamento. Repetir o comando não altera a senha de uma conta existente. Se o banco foi restaurado, utilize as contas e senhas preservadas; o reset de acesso é realizado pelo administrador no painel.
 
-Em um banco novo, crie as unidades, os gestores e os alunos pelo administrador. Autorize os gestores nas unidades e atribua unidade/matrícula aos alunos. Não há cadastro público. Administradores e gestores podem abrir Gestão para selecionar uma unidade e organizar turmas e alunos; o gestor só vê as escolas autorizadas para sua conta.
+Em um banco novo, crie as unidades, os gestores e os alunos pelo administrador. Autorize os gestores nas unidades e atribua unidade/matrícula aos alunos. Não há cadastro público. Administradores podem abrir Gestão para selecionar uma unidade e consultar turmas e alunos; somente gestores podem cadastrá-las e organizar os vínculos de turma; o gestor só vê as escolas autorizadas para sua conta.
 
 ## 6. Executar e verificar
 
@@ -140,3 +140,7 @@ Se houver alterações locais antes do `pull`, salve-as em um commit ou guarde-a
 O Git sincroniza o código. Os bancos locais de cada computador são independentes e não são sincronizados automaticamente. Após receber novas migrações, execute `npm.cmd run db:migrate` antes de continuar.
 
 Nunca versione `.env`, backups ou dados de usuários. As exclusões correspondentes já estão no `.gitignore` do projeto.
+
+A migração 012 adapta as contas ao [cadastro e autenticação por categoria](CADASTRO_E_AUTENTICACAO.md). Senhas pessoais existentes são preservadas; o reset de aluno passa a usar a matrícula, e o de profissional usa CPF. Revise os cadastros sinalizados como incompletos antes de resetar.
+
+Desde a migração 013, alunos entram somente por matrícula e profissionais por CPF. `ADMIN_CPF` substitui `ADMIN_USERNAME` no provisionamento; informe o CPF correto no `.env` local. A senha configurada em `ADMIN_PASSWORD` é usada somente na criação do administrador inicial. Completar CPF de um administrador legado pelo mesmo e-mail não altera sua senha pessoal.

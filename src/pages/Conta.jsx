@@ -74,7 +74,7 @@ export default function Conta() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center gap-3"><UserRound className="text-sky-700" size={24} aria-hidden="true" /><h2 className="font-black text-slate-950">Dados cadastrais</h2></div>
-          <dl className="space-y-4 text-sm">{[["Nome", user?.nome], ["Email", user?.email], ["Turma", user?.turma || "—"], [user?.role === "GESTOR_ESCOLAR" ? "Unidade ativa" : "Escola", activeUnit?.name || user?.escola || "—"]].map(([label, value]) => <div key={label}><dt className="font-bold text-slate-500">{label}</dt><dd className="mt-1 text-slate-950">{value}</dd></div>)}</dl>
+          <dl className="space-y-4 text-sm">{[["Nome completo", user?.nome], ...(user?.role === "USER" ? [["Turma", user?.turma || "Aguardando turma"]] : [["E-mail profissional", user?.email || "Não informado"]]), [user?.role === "GESTOR_ESCOLAR" ? "Unidade ativa" : "Escola", activeUnit?.name || user?.escola || "—"]].map(([label, value]) => <div key={label}><dt className="font-bold text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-950">{value}</dd></div>)}</dl>
           <p className="mt-5 text-sm text-slate-600">Alterações cadastrais e reset de senha devem ser solicitados a um administrador.</p>
         </section>
 
