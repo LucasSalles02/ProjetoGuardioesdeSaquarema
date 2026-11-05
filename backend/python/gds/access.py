@@ -5,10 +5,11 @@ from .security import identifier
 from .time import now
 from psycopg.types.json import Jsonb
 
+MANAGER_ONLY = {"classes.create", "classes.update", "enrollments.update"}
 
 def module(key, label, roles, actions, reference, scope="platform", implemented=True):
     return {"id": key, "label": label, "roles": roles, "reference": reference, "scope": scope,
-            "actions": [{"id": action, "label": title, "implemented": implemented and action != "delete"}
+            "actions": [{"id": action, "label": title, "implemented": implemented and action != "delete", "roles": ["GESTOR_ESCOLAR"] if f"{key}.{action}" in MANAGER_ONLY else roles}
                         for action, title in actions]}
 
 
@@ -33,7 +34,7 @@ CATALOG = [
 
 
 def allowed(role):
-    return {f"{m['id']}.{a['id']}" for m in CATALOG if role in m["roles"] for a in m["actions"]}
+    return {f"{m['id']}.{a['id']}" for m in CATALOG if role in m["roles"] for a in m["actions"] if role in a["roles"]}
 
 
 def effective(service, user_id):
@@ -49,7 +50,12 @@ def require(service, user_id, permission):
 
 
 def require_delegation(service, actor_id, permissions):
-    delegable = set(effective(service, actor_id)["permissions"])
+    profile = effective(service, actor_id)
+    delegable = set(profile["permissions"])
+    if profile["base_role"] == "ADMIN":
+        # Managing accounts/profiles may delegate school operations to managers;
+        # it never authorizes an administrator to execute those operations.
+        delegable.update(MANAGER_ONLY)
     # Authorizing managers to schools includes delegating the scoped school reader.
     # It does not give administrators the manager-only endpoint or any school data bypass.
     if "institutions.update" in delegable:

@@ -37,8 +37,7 @@ export default function EditUserDialog({ userId, onSaved }) {
     try {
       const { usuario } = await admin.editarUsuario(userId, data);
       if (userId === user.id) {
-        const identityChanged = data.cpf !== account.cpf || data.email !== account.email
-          || data.username.toLowerCase() !== account.username;
+        const identityChanged = data.cpf !== account.cpf || data.email !== account.email;
         if (identityChanged) {
           await logout();
           navigate("/admin/login", { replace: true, state: { notice: "Cadastro atualizado. Entre novamente com seus dados atualizados." } });

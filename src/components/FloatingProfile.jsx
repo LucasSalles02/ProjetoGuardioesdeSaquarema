@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../services/permissions";
 import { useSchool } from "../context/SchoolContext";
+import LevelBadge from "./LevelBadge";
 
 export default function FloatingProfile() {
   const { user, requestLogout } = useAuth();
@@ -87,10 +88,10 @@ export default function FloatingProfile() {
 
   if (!user) return null;
   const initial = user.nome?.trim().charAt(0).toLocaleUpperCase("pt-BR") || "U";
-  return <aside ref={panel} onPointerEnter={enter} onPointerLeave={leave} aria-label="Perfil do usuário" data-expanded={expanded} className="floating-profile fixed right-4 top-4 z-40 rounded-2xl border border-cyan-100 bg-white/95 shadow-lg shadow-sky-950/10 backdrop-blur sm:right-6">
+  return <aside ref={panel} onPointerEnter={enter} onPointerLeave={leave} aria-label="Perfil do usuário" data-expanded={expanded} className="floating-profile relative ml-auto rounded-2xl border border-cyan-100 bg-white/95 shadow-lg shadow-sky-950/10 backdrop-blur">
     <div className="floating-profile-header flex items-center">
       <button ref={toggle} type="button" onClick={() => { cancelClose(); if (!busy) setExpanded(value => !value); }} aria-expanded={expanded} aria-controls="floating-profile-details" aria-label={expanded ? "Minimizar perfil" : `Expandir perfil de ${user.nome}`} title={expanded ? "Minimizar perfil" : "Abrir perfil"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-emerald-100 text-lg font-black text-emerald-800 outline-none transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 motion-reduce:transform-none">{initial}</button>
-      <div className="floating-profile-summary min-w-0 flex-1" aria-hidden={!expanded} inert={expanded ? undefined : ""}><div className="flex min-w-0 items-center gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-950" title={user.nome}>{user.nome}</p><p className="mt-0.5 truncate text-xs text-slate-500">{user.profile_name || "Minha conta"}</p></div><button type="button" onClick={() => { close(); toggle.current?.focus(); }} disabled={busy} aria-label="Minimizar perfil" title="Minimizar perfil" className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 focus-visible:outline-sky-600 disabled:opacity-50"><ChevronUp size={18} aria-hidden="true" /></button></div></div>
+      <div className="floating-profile-summary min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><div className="min-w-0 flex-1"><p className="whitespace-normal text-sm font-bold leading-snug text-slate-950 [overflow-wrap:anywhere]" title={user.nome}>{user.nome}</p><p className={`${expanded ? "" : "hidden "}mt-0.5 truncate text-xs text-slate-500`}>{user.profile_name || "Minha conta"}</p></div>{user.role === "USER" && <LevelBadge level={user.nivel} size="profile" />}<button type="button" onClick={() => { close(); toggle.current?.focus(); }} disabled={busy} aria-label="Minimizar perfil" title="Minimizar perfil" className={`${expanded ? "" : "hidden "}shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 focus-visible:outline-sky-600 disabled:opacity-50`}><ChevronUp size={18} aria-hidden="true" /></button></div></div>
     </div>
     <div id="floating-profile-details" className="floating-profile-details" aria-hidden={!expanded} inert={expanded ? undefined : ""}><div className="min-h-0 overflow-hidden">
       {(user.role === "GESTOR_ESCOLAR" || (user.admin && can(user, "institutions.read") && (can(user, "classes.read") || can(user, "enrollments.read")))) && <section className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3" aria-label="Unidade Escolar ativa">

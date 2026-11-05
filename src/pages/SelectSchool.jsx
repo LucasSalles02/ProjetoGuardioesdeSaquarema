@@ -31,7 +31,7 @@ export default function SelectSchool() {
     finally { setLeaving(false); }
   }
   return <>
-    <div inert="" aria-hidden="true" className="marine-app-bg min-h-screen lg:flex"><Sidebar /><main className="min-w-0 flex-1 pt-20"><PageShell title="Gestão Escolar" description="Selecione uma unidade para carregar seus dados."><div className="grid gap-5 sm:grid-cols-2"><div className="h-52 rounded-2xl border border-slate-200 bg-white/80" /><div className="h-52 rounded-2xl border border-slate-200 bg-white/80" /></div></PageShell></main></div>
+    <div inert="" aria-hidden="true" className="marine-app-bg min-h-dvh lg:flex"><Sidebar /><main className="min-w-0 flex-1 pt-20"><PageShell title="Gestão Escolar" description="Selecione uma unidade para carregar seus dados."><div className="grid gap-5 sm:grid-cols-2"><div className="h-52 rounded-2xl border border-slate-200 bg-white/80" /><div className="h-52 rounded-2xl border border-slate-200 bg-white/80" /></div></PageShell></main></div>
     <AdminDialog title="Escolha a Unidade Escolar" description={`${user.admin ? "Administração" : "Gestão Escolar"} · ${user.nome}`} icon={School} busy={switching || leaving} dismissible={Boolean(activeUnit) || user.admin} onClose={() => navigate(activeUnit ? destination : "/admin/dashboard", { replace: true })}>
       <div className="p-5"><p className="text-sm leading-relaxed text-slate-600">Escolha a unidade para entrar. Você poderá trocá-la pelo menu do seu perfil.</p>
         {(error || selectionError) && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{selectionError || error}</p>}

@@ -113,7 +113,7 @@ export default function MissoesDiarias() {
               }`}
             >
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex gap-4">
+                <div className="flex min-w-0 gap-3">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
                     missao.concluida ? "bg-emerald-600 text-white" : "bg-sky-50 text-sky-700"
                   }`}>
@@ -127,7 +127,7 @@ export default function MissoesDiarias() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm font-semibold text-slate-600">{missao.descricao}</p>
-                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                    <div className="adaptive-card-grid mt-3 grid gap-2">
                       <MissionDetail icon={ClipboardList} label="Aprendizado" text={missao.aprendizado} />
                       <MissionDetail icon={Leaf} label="Impacto" text={missao.impacto} />
                     </div>

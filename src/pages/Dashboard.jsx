@@ -75,7 +75,7 @@ function StudentDashboard() {
       description="Seu painel de aprendizagem ambiental e proteção das praias."
     >
       <section className="sea-hero relative overflow-hidden rounded-3xl border border-white/80 p-6 shadow-sm sm:p-8">
-        <div className="grid gap-8 lg:grid-cols-[1fr_420px] lg:items-center">
+        <div className="responsive-hero-grid grid items-center gap-6">
           <div className="relative z-10">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-wide text-sky-800">
               <Waves size={15} aria-hidden="true" />
@@ -109,14 +109,14 @@ function StudentDashboard() {
         </div>
       </section>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="adaptive-metric-grid mt-6 grid gap-4">
         <StatCard label="Pontos" value={stats.xp?.toLocaleString("pt-BR") || "0"} icon={Leaf} tone="sky" />
         <StatCard label="Atividades concluídas" value={(stats.missoesConcluidas || 0) + aulasConcluidas} icon={CheckCircle2} tone="emerald" />
         <StatCard label="Nível atual" value={stats.nivel || 1} icon={Medal} tone="blue" />
         <StatCard label="Conquistas" value={conquistasObtidas} icon={BarChart3} tone="violet" />
       </div>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-3">
+      <section className="adaptive-card-grid mt-6 grid gap-4">
         <ActionCard
           to="/jogos"
           icon={Gamepad2}
@@ -140,7 +140,7 @@ function StudentDashboard() {
         />
       </section>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <div className="adaptive-wide-grid mt-6 grid gap-4">
         <section className="sea-card rounded-3xl p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">

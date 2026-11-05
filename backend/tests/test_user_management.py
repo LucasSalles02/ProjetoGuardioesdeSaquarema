@@ -10,12 +10,12 @@ from gds.database import connection, migrate
 
 def new_account(role="USER", suffix="one"):
     return {"nome": f"Conta {suffix}", "username": f"conta_{suffix}", "email": f"{suffix}@example.com",
-            "cpf": f"{secrets.randbelow(10**11):011d}", "birth_date": "29/02/2000", "role": role}
+            "registration_number": "000" + suffix, "cpf": f"{secrets.randbelow(10**11):011d}", "birth_date": "29/02/2000", "role": role}
 
 
 def login(client, payload, password=None):
     path = "/api/auth/admin/login" if payload["role"] == "ADMIN" else "/api/auth/login"
-    return client.post(path, json={"username": payload["cpf"], "email": payload["cpf"], "senha": password or payload["cpf"]})
+    return client.post(path, json={("registration_number" if payload["role"] == "USER" else "cpf"): payload["registration_number"] if payload["role"] == "USER" else payload["cpf"], "senha": password or (payload["registration_number"] if payload["role"] == "USER" else payload["cpf"])})
 
 
 def enter(client, payload):
@@ -46,7 +46,7 @@ def test_cpf_first_access_restricts_all_profiles_until_password_set(client, admi
         assert client.get(path, headers=headers).status_code == 403
     assert client.patch("/api/account/password", headers=headers, json={"senhaAtual": payload["cpf"], "novaSenha": "novaSenha123456"}).status_code == 403
     assert client.get("/api/auth/me", headers=headers).json()["usuario"]["must_change_password"] is True
-    for values in [{"novaSenha": "short", "confirmarSenha": "short"}, {"novaSenha": "senhaNova123456", "confirmarSenha": "diferente"}, {"novaSenha": payload["cpf"], "confirmarSenha": payload["cpf"]}]:
+    for values in [{"novaSenha": "short", "confirmarSenha": "short"}, {"novaSenha": "senhaNova123456", "confirmarSenha": "diferente"}, {"novaSenha": payload["registration_number"] if role == "USER" else payload["cpf"], "confirmarSenha": payload["registration_number"] if role == "USER" else payload["cpf"]}]:
         assert client.post("/api/auth/first-access/password", headers=headers, json=values).status_code == 400
     password = secrets.token_hex(16)
     setup = client.post("/api/auth/first-access/password", headers=headers, json={"novaSenha": password, "confirmarSenha": password})
@@ -79,7 +79,7 @@ def test_duplicates_and_validation(client, admin_headers):
         assert client.post("/api/admin/users", headers=admin_headers, json={**payload, **override}).status_code == 400
     for override in [{"role": []}, {"role": "SUPERADMIN"}, {"cpf": "1234567890"}, {"cpf": "123456789012"}, {"cpf": 12345678901},
         {"cpf": "abc12345678901"}, {"birth_date": "2000-02-29"}, {"birth_date": "31/02/2000"}, {"birth_date": "01/01/9999"},
-        {"username": "x"}, {"nome": "a"}, {"email": "invalid"}, {"senha": "nao-permitida"}]:
+        {"nome": "a"}, {"email": "invalid"}, {"senha": "nao-permitida"}]:
         assert client.post("/api/admin/users", headers=admin_headers, json={**new_account(suffix="invalid"), **override}).status_code == 400
     leading = new_account(suffix="leading")
     leading["cpf"] = "001.234.567-89"
@@ -103,6 +103,9 @@ def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, ad
             Service(db).submit_mission(target["id"], "lixo-marinho", evidence)
     else:
         assert client.post("/api/missions/lixo-marinho/submit", headers=headers, json=evidence).status_code == 200
+    with connection(db_url) as db:
+        previous_xp = db.execute("SELECT xp FROM stats WHERE user_id=%s", (target["id"],)).fetchone()["xp"]
+        previous_activities = db.execute("SELECT COUNT(*) AS n FROM activities WHERE user_id=%s", (target["id"],)).fetchone()["n"]
     response = client.post(f"/api/admin/users/{target['id']}/reset-password", headers=admin_headers)
     assert response.status_code == 200 and response.json()["usuario"]["must_change_password"] is True
     for value in [headers, {"Authorization": f"Bearer {extra}"}]:
@@ -112,12 +115,12 @@ def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, ad
     assert initial.status_code == 200
     assert client.get("/api/progress", headers={"Authorization": f"Bearer {initial.json()['token']}"}).status_code == 403
     with connection(db_url) as db:
-        assert db.execute("SELECT xp FROM stats WHERE user_id=%s", (target["id"],)).fetchone()["xp"] == 100
-        assert db.execute("SELECT COUNT(*) AS n FROM activities WHERE user_id=%s", (target["id"],)).fetchone()["n"] == 2
+        assert db.execute("SELECT xp FROM stats WHERE user_id=%s", (target["id"],)).fetchone()["xp"] == previous_xp
+        assert db.execute("SELECT COUNT(*) AS n FROM activities WHERE user_id=%s", (target["id"],)).fetchone()["n"] == previous_activities
 
 
 def test_edit_cpf_pending_and_completed_accounts_and_protect_password(client, admin_headers):
-    payload = new_account()
+    payload = new_account("GESTOR_ESCOLAR")
     target = client.post("/api/admin/users", headers=admin_headers, json=payload).json()["usuario"]
     path = f"/api/admin/users/{target['id']}"
     old_headers = {"Authorization": f"Bearer {login(client, payload).json()['token']}"}
@@ -155,12 +158,12 @@ def test_deactivation_blocks_first_access_and_does_not_delete_history(client, ad
 def test_self_admin_role_and_deactivation_protected_and_own_reset_works(client, admin_headers, account):
     user_id = account["usuario"]["id"]
     assert client.patch(f"/api/admin/users/{user_id}/deactivate", headers=admin_headers).status_code == 400
-    assert client.post(f"/api/admin/users/{user_id}/reset-password", headers=admin_headers).status_code == 400  # No legacy CPF yet.
+    # Existing personal access is preserved while the identity is edited below.
     data = {"nome": "Gestor", "username": "gestor", "email": "aluno@example.com", "cpf": "00123456789", "birth_date": "01/01/1980", "role": "USER"}
     assert client.patch(f"/api/admin/users/{user_id}", headers=admin_headers, json=data).status_code == 400
     data["role"] = "ADMIN"
     assert client.patch(f"/api/admin/users/{user_id}", headers=admin_headers, json=data).status_code == 200
-    fresh = client.post("/api/auth/admin/login", json={"username": "gestor", "senha": "segredo123"}).json()["token"]
+    fresh = client.post("/api/auth/admin/login", json={"cpf": "00123456789", "senha": "segredo123"}).json()["token"]
     assert client.post(f"/api/admin/users/{user_id}/reset-password", headers={"Authorization": f"Bearer {fresh}"}).status_code == 200
     assert client.get("/api/admin/users", headers={"Authorization": f"Bearer {fresh}"}).status_code == 401
 

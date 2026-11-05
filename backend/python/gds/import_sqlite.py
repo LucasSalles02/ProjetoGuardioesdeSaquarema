@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from psycopg import sql
+from psycopg.types.json import Jsonb
 
 from .database import connection, migrate
 from .time import now
@@ -49,8 +50,16 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
         row.setdefault("birth_date", None)
         row.setdefault("must_change_password", False)
         row.setdefault("access_profile_id", None)
+        row.setdefault("registration_number", None)
+        row.setdefault("guardians", [])
+        row.setdefault("initial_credential_version", 0)
     for row in data["sessions"]:
         row.setdefault("school_id", None)
+    # Translate future rewards to RN28 without touching accumulated XP/history.
+    for row in data["missions"]:
+        xp = row["xp_recompensa"]
+        if xp not in (10, 20, 30):
+            row["xp_recompensa"] = 10 if xp <= 40 else 20 if xp <= 60 else 30
     migrate(url)
     with connection(url) as db:
         db.execute("SELECT pg_advisory_xact_lock(18022027)")
@@ -71,9 +80,11 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
                 columns = list(row)
                 query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(sql.Identifier(table),
                     sql.SQL(",").join(map(sql.Identifier, columns)), sql.SQL(",").join(sql.Placeholder() for _ in columns))
-                db.execute(query, [row[key] for key in columns])
+                db.execute(query, [Jsonb(row[key]) if key == "guardians" else row[key] for key in columns])
             imported = db.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))).fetchall()
             if canonical(imported) != canonical(rows):
                 raise RuntimeError(f"Conferencia de importacao falhou: {table}. Transacao revertida.")
+        from .onboarding import upgrade_credentials
+        upgrade_credentials(db)
         db.execute("INSERT INTO import_receipts (source_digest,imported_at,table_counts) VALUES (%s,%s,%s)", (digest, now(), json.dumps(counts)))
     return {"imported": True, "counts": counts, "backup": str(backup)}

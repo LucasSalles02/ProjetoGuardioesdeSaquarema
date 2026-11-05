@@ -22,6 +22,8 @@ def test_documented_profiles_and_school_boundaries(client, admin_headers):
     assert "progress.read" not in grants  # School reports never imply access to another person's own progress.
     assert "missions.submit" in profiles["USER"]["permissions"]
     assert "users.create" in profiles["ADMIN"]["permissions"]
+    assert not {"classes.create", "classes.update", "enrollments.update"} & set(profiles["ADMIN"]["permissions"])
+    assert {"classes.create", "classes.update", "enrollments.update"} <= set(grants)
     for module in result.json()["modulos"]:
         if module["scope"] == "school" and module["id"] not in ["school_units", "classes", "enrollments", "school_progress"]:
             assert not any(a["implemented"] for a in module["actions"])
@@ -42,6 +44,9 @@ def test_only_admin_manages_profiles(client, account, auth_headers, db_url, role
     {"base_role": "ADMIN", "permissions": ["users.read", "users.create"]},
     {"permissions": ["unknown.read"]},
     {"permissions": "learning.read"},
+    {"base_role": "ADMIN", "permissions": ["classes.read", "classes.create"]},
+    {"base_role": "ADMIN", "permissions": ["classes.read", "classes.update"]},
+    {"base_role": "ADMIN", "permissions": ["enrollments.read", "classes.read", "enrollments.update"]},
     {"base_role": "GESTOR_ESCOLAR", "permissions": ["school_progress.read"]},
     {"base_role": "GESTOR_ESCOLAR", "permissions": ["school_progress.reports"]},
     {"name": ""},
@@ -60,11 +65,11 @@ def test_system_profiles_are_preserved_and_duplicate_names_rejected(client, admi
 def test_assignment_enforcement_and_session_revocation(client, admin_headers, db_url):
     profile = create_profile(client, admin_headers).json()["perfil"]
     data = {"nome": "Aluno Perfil", "username": "perfil.aluno", "email": "perfil@example.com",
-            "cpf": "00123456789", "birth_date": "01/02/2000", "role": "USER", "profile_id": profile["id"]}
+            "cpf": "00123456789", "birth_date": "01/02/2000", "role": "USER", "registration_number": "000001", "profile_id": profile["id"]}
     created = client.post("/api/admin/users", headers=admin_headers, json=data)
     assert created.status_code == 200, created.text
     assert created.json()["usuario"]["profile_name"] == profile["name"]
-    login = client.post("/api/auth/login", json={"email": data["email"], "senha": data["cpf"]})
+    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": data["registration_number"]})
     initial_headers = {"Authorization": "Bearer " + login.json()["token"]}
     password = "NovaSenha12345"
     setup = client.post("/api/auth/first-access/password", headers=initial_headers, json={"novaSenha": password, "confirmarSenha": password})
@@ -78,7 +83,7 @@ def test_assignment_enforcement_and_session_revocation(client, admin_headers, db
                           json={**profile, "permissions": []})
     assert result.status_code == 200
     assert client.get("/api/auth/me", headers=headers).status_code == 401
-    login = client.post("/api/auth/login", json={"email": data["email"], "senha": password})
+    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": password})
     assert login.json()["usuario"]["permissions"] == []
     assert client.get("/api/learning/modules", headers={"Authorization": "Bearer " + login.json()["token"]}).status_code == 403
     with connection(db_url) as db:

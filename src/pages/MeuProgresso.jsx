@@ -52,8 +52,8 @@ export default function MeuProgresso() {
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Evolução para o próximo nível</h2>
-            <p className="text-sm text-slate-600">{stats.xp || 0} de {stats.xpProximoNivel || 500} XP</p>
+            <h2 className="text-lg font-black text-slate-950">{stats.nivelMaximo ? "Nível máximo alcançado" : "Evolução para o próximo nível"}</h2>
+            <p className="text-sm text-slate-600">{stats.nivelMaximo ? `${stats.xp || 0} XP acumulados. Continue aprendendo e somando XP!` : `${stats.xp || 0} de ${stats.xpProximoNivel || 100} XP · Faltam ${stats.xpFaltante ?? 100} XP`}</p>
           </div>
           <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
             {stats.percentualNivel || 0}%

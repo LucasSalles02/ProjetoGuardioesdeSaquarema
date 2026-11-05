@@ -20,8 +20,8 @@ def test_health_and_registration(client, account, auth_headers, db_url):
 def test_login_duplicate_logout_and_password(client, account, auth_headers):
     duplicate = client.post("/api/auth/register", json={"nome": "Aluno", "email": " ALUNO@EXAMPLE.COM ", "senha": "segredo123"})
     assert duplicate.status_code == 403
-    assert client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": "errada"}).status_code == 401
-    logged = client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": "segredo123"})
+    assert client.post("/api/auth/login", json={"registration_number": "fixture-001", "senha": "errada"}).status_code == 401
+    logged = client.post("/api/auth/login", json={"registration_number": "fixture-001", "senha": "segredo123"})
     assert logged.status_code == 200
     assert client.post("/api/auth/logout", headers=auth_headers).json() == {"ok": True}
     assert client.get("/api/auth/me", headers=auth_headers).status_code == 401
@@ -29,7 +29,7 @@ def test_login_duplicate_logout_and_password(client, account, auth_headers):
     assert client.patch("/api/account/password", headers=headers, json={"senhaAtual": "errada", "novaSenha": "novosegredo123"}).status_code == 400
     assert client.patch("/api/account/password", headers=headers, json={"senhaAtual": "segredo123", "novaSenha": "novosegredo123"}).status_code == 200
     assert client.get("/api/auth/me", headers=headers).status_code == 401
-    assert client.post("/api/auth/login", json={"email": "aluno@example.com", "senha": "novosegredo123"}).status_code == 200
+    assert client.post("/api/auth/login", json={"registration_number": "fixture-001", "senha": "novosegredo123"}).status_code == 200
 
 
 def test_profile_edits_require_administrative_endpoint(client, account, auth_headers):
@@ -45,12 +45,12 @@ def test_protected_routes(client, path):
 
 
 def test_expiration_and_current_role(client, auth_headers, admin_headers, db_url):
-    assert client.post("/api/auth/admin/login", json={"username": "GESTOR", "senha": "segredo123"}).status_code == 200
+    assert client.post("/api/auth/admin/login", json={"cpf": "99123456789", "senha": "segredo123"}).status_code == 200
     assert client.get("/api/admin/users", headers=admin_headers).status_code == 200
     with connection(db_url) as db:
         db.execute("UPDATE users SET role='USER'")
     assert client.get("/api/admin/users", headers=admin_headers).status_code == 403
-    assert client.post("/api/auth/admin/login", json={"username": "gestor", "senha": "segredo123"}).status_code == 401
+    assert client.post("/api/auth/admin/login", json={"cpf": "99123456789", "senha": "segredo123"}).status_code == 401
     with connection(db_url) as db:
         db.execute("UPDATE sessions SET created_at='2000-01-01T00:00:00.000Z'")
     assert client.get("/api/auth/me", headers=auth_headers).status_code == 401
@@ -73,9 +73,9 @@ def test_missions_quiz_and_achievements(client, auth_headers):
     assert client.post(endpoint, headers=auth_headers, json={"residuo1": "garrafa"}).status_code == 400
     evidence = {"residuo1": "garrafa", "residuo2": "sacola", "residuo3": "canudo"}
     done = client.post(endpoint, headers=auth_headers, json=evidence).json()
-    assert done["xpGanho"] == 100
+    assert done["xpGanho"] == 20
     assert done["usuario"]["missoesConcluidas"] == 1
-    assert done["novasConquistas"][0]["id"] == "primeira-missao"
+    assert done["novasConquistas"][0]["id"] == "nivel-1"
     assert client.post(endpoint, headers=auth_headers, json=evidence).json()["xpGanho"] == 0
     assert client.post("/api/missions/quiz-ambiental/submit", headers=auth_headers, json={"respostas": {}}).status_code == 400
     answers = {"residuo-praia": "recolher-descartar", "animal-silvestre": "observar-distancia", "microplasticos": "reutilizaveis"}
@@ -102,7 +102,7 @@ def test_concurrent_reward_once(client, auth_headers):
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(lambda _: client.post("/api/missions/lixo-marinho/submit", headers=auth_headers, json=evidence), range(4)))
     assert all(result.status_code == 200 for result in results)
-    assert sorted(result.json()["xpGanho"] for result in results) == [0, 0, 0, 100]
+    assert sorted(result.json()["xpGanho"] for result in results) == [0, 0, 0, 20]
 
 
 def test_admin_content_lifecycle(client, admin_headers):
@@ -115,10 +115,10 @@ def test_admin_content_lifecycle(client, admin_headers):
     edited = client.patch("/api/admin/modules/modulo-local/lessons/aula-local", headers=admin_headers, json={"xp": 65})
     assert edited.json()["modulo"]["lessons"][0]["xp"] == 65
     assert client.patch("/api/admin/modules/modulo-local", headers=admin_headers, json={"active": False}).status_code == 200
-    mission = {"titulo": "Auditoria Local", "descricao": "Registrar tres itens", "xpRecompensa": 45, "validationType": "list"}
+    mission = {"titulo": "Auditoria Local", "descricao": "Registrar tres itens", "xpRecompensa": 20, "validationType": "list"}
     created = client.post("/api/admin/missions", headers=admin_headers, json=mission)
     assert created.status_code == 200, created.text
-    assert created.json()["missao"]["xpRecompensa"] == 45
+    assert created.json()["missao"]["xpRecompensa"] == 20
     assert client.patch("/api/admin/missions/auditoria-local", headers=admin_headers, json={"active": False}).status_code == 200
     assert client.patch("/api/admin/games/memory", headers=admin_headers, json={"xpRecompensa": 75, "enabled": False}).json()["jogo"]["xpRecompensa"] == 75
     content = client.get("/api/admin/content", headers=admin_headers).json()

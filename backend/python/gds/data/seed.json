@@ -1,40 +1,84 @@
 {
   "achievements": [
     {
-      "id": "primeira-missao",
+      "id": "nivel-1",
       "titulo": "Primeira onda",
-      "descricao": "Conclua sua primeira missão diária.",
-      "xp": 50
+      "descricao": "Alcance o nível 1.",
+      "nivelNecessario": 1,
+      "xpNecessario": 0,
+      "xp": 0
     },
     {
-      "id": "guardiao-do-mar",
-      "titulo": "Guardião do mar",
-      "descricao": "Complete 10 missões ambientais.",
-      "xp": 200
+      "id": "nivel-2",
+      "titulo": "Semente do futuro",
+      "descricao": "Alcance o nível 2.",
+      "nivelNecessario": 2,
+      "xpNecessario": 100,
+      "xp": 0
     },
     {
-      "id": "sequencia-tres",
-      "titulo": "Maré constante",
-      "descricao": "Mantenha uma sequência de 3 dias ativos.",
-      "xp": 120
+      "id": "nivel-3",
+      "titulo": "Amigo da praia",
+      "descricao": "Alcance o nível 3.",
+      "nivelNecessario": 3,
+      "xpNecessario": 200,
+      "xp": 0
     },
     {
-      "id": "vida-marinha",
+      "id": "nivel-4",
+      "titulo": "Protetor das águas",
+      "descricao": "Alcance o nível 4.",
+      "nivelNecessario": 4,
+      "xpNecessario": 300,
+      "xp": 0
+    },
+    {
+      "id": "nivel-5",
       "titulo": "Explorador marinho",
-      "descricao": "Conclua todas as aulas de Vida Marinha.",
-      "xp": 150
+      "descricao": "Alcance o nível 5.",
+      "nivelNecessario": 5,
+      "xpNecessario": 400,
+      "xp": 0
     },
     {
-      "id": "mil-xp",
-      "titulo": "Mil gotas de impacto",
-      "descricao": "Acumule 1.000 XP na plataforma.",
-      "xp": 250
+      "id": "nivel-6",
+      "titulo": "Guardião da lagoa",
+      "descricao": "Alcance o nível 6.",
+      "nivelNecessario": 6,
+      "xpNecessario": 550,
+      "xp": 0
     },
     {
-      "id": "nivel-cinco",
-      "titulo": "Guardião nível 5",
-      "descricao": "Alcance o nível 5 em Guardiões de Saquarema.",
-      "xp": 300
+      "id": "nivel-7",
+      "titulo": "Defensor da natureza",
+      "descricao": "Alcance o nível 7.",
+      "nivelNecessario": 7,
+      "xpNecessario": 700,
+      "xp": 0
+    },
+    {
+      "id": "nivel-8",
+      "titulo": "Herói dos oceanos",
+      "descricao": "Alcance o nível 8.",
+      "nivelNecessario": 8,
+      "xpNecessario": 850,
+      "xp": 0
+    },
+    {
+      "id": "nivel-9",
+      "titulo": "Mestre da sustentabilidade",
+      "descricao": "Alcance o nível 9.",
+      "nivelNecessario": 9,
+      "xpNecessario": 1000,
+      "xp": 0
+    },
+    {
+      "id": "nivel-10",
+      "titulo": "Guardião de Saquarema",
+      "descricao": "Alcance o nível 10.",
+      "nivelNecessario": 10,
+      "xpNecessario": 1200,
+      "xp": 0
     }
   ],
   "missions": [
@@ -44,7 +88,7 @@
       "descricao": "Observe sua casa, escola ou caminho até a praia e identifique 3 resíduos que poderiam virar lixo marinho.",
       "aprendizado": "Ciclo do resíduo",
       "impacto": "Ajuda a reconhecer a origem da poluição antes dela chegar às lagoas e praias.",
-      "xpRecompensa": 50,
+      "xpRecompensa": 20,
       "categoria": "Observação"
     },
     {
@@ -53,7 +97,7 @@
       "descricao": "Revise o conteúdo curto sobre microplásticos e registre uma atitude para reduzir descartáveis.",
       "aprendizado": "Poluição invisível",
       "impacto": "Mostra como pequenas partículas afetam peixes, tartarugas e a cadeia alimentar.",
-      "xpRecompensa": 35,
+      "xpRecompensa": 10,
       "categoria": "Estudo"
     },
     {
@@ -62,7 +106,7 @@
       "descricao": "Complete o desafio diário sobre biodiversidade costeira e boas práticas na praia.",
       "aprendizado": "Biodiversidade local",
       "impacto": "Reforça decisões rápidas que protegem animais e áreas sensíveis.",
-      "xpRecompensa": 80,
+      "xpRecompensa": 30,
       "categoria": "Desafio"
     },
     {
@@ -71,7 +115,7 @@
       "descricao": "Crie uma dica simples de reciclagem ou economia de água para sua turma aplicar esta semana.",
       "aprendizado": "Ação coletiva",
       "impacto": "Transforma conhecimento ambiental em prática comunitária.",
-      "xpRecompensa": 40,
+      "xpRecompensa": 10,
       "categoria": "Comunidade"
     }
   ],

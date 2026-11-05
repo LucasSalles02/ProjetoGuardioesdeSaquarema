@@ -36,7 +36,7 @@ O proxy usa IPv4 explícito e acompanha `PORT`. Em produção, publique `dist/` 
 
 ## Administrador
 
-Defina valores próprios no ambiente local para `GUARDIOES_DE_SAQUAREMA_ADMIN_USERNAME`, `GUARDIOES_DE_SAQUAREMA_ADMIN_PASSWORD`, `GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL` e, opcionalmente, `GUARDIOES_DE_SAQUAREMA_ADMIN_NAME`.
+Defina valores próprios no ambiente local para `GUARDIOES_DE_SAQUAREMA_ADMIN_CPF`, `GUARDIOES_DE_SAQUAREMA_ADMIN_PASSWORD`, `GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL` e, opcionalmente, `GUARDIOES_DE_SAQUAREMA_ADMIN_NAME`.
 
 O usuário aceita 3 a 40 letras minúsculas, números, ponto, hífen e sublinhado. A senha exige 12 a 256 caracteres. O email deve ser exclusivo.
 
@@ -79,3 +79,9 @@ O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadas
 ## Desativação e saída
 
 Unidades Escolares possui abas de ativas e desativadas. Desativar exige confirmação dos efeitos: alunos ficam sem unidade/turma, gestores perdem a autorização e os contextos da unidade são limpos; contas e progresso são preservados. Todo botão **Sair** solicita confirmação em qualquer perfil. XP e nível do perfil suspenso são exibidos somente para Aluno.
+
+Na Gestão de Turmas e Alunos, o Administrador acessa qualquer unidade somente para consulta. Criar/editar turmas e vincular/transferir alunos entre turmas são operações exclusivas do Gestor Escolar, protegidas na API e pela migração `010_admin_classes_read_only.sql`.
+
+XP e conquistas seguem a progressão de dez níveis do relatório atualizado, com nível máximo aos 1.200 XP. Consulte [as regras e a compatibilidade dos dados](docs/XP_NIVEIS_E_CONQUISTAS.md); execute as migrações ao atualizar.
+
+Cadastro e acesso por categoria: alunos usam matrícula no login e como senha temporária; gestores e administradores usam CPF no login e como senha temporária. Veja [cadastro, privacidade e migração de contas existentes](docs/CADASTRO_E_AUTENTICACAO.md).

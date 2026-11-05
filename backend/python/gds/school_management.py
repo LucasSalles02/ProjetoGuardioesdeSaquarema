@@ -1,4 +1,5 @@
 """School-scoped classes and single-class memberships, RF15-17 and RN03-06/14-15."""
+from .progression import progression
 from .errors import ApiError
 from .schools import _id
 from .access import require
@@ -55,6 +56,7 @@ def classes(service, actor_id):
 
 
 def save_class(service, actor_id, data, class_id=None):
+    require_manager_write(service, actor_id)
     school_id = scoped_school(service, actor_id)
     if set(data) - {"identification", "stage_id"}:
         raise ApiError("Informe somente identificacao e etapa. A unidade e definida pela sessao.")
@@ -84,6 +86,7 @@ def students(service, actor_id):
 
 
 def assign_class(service, actor_id, student_id, data):
+    require_manager_write(service, actor_id)
     school_id = scoped_school(service, actor_id)
     if set(data) != {"class_id"}:
         raise ApiError("Informe somente a turma. Nao e permitido alterar XP, niveis ou dados cadastrais.")
@@ -99,6 +102,12 @@ def assign_class(service, actor_id, student_id, data):
     return {"aluno": next(row for row in students(service, actor_id)["alunos"] if row["id"] == student_id)}
 
 
+def require_manager_write(service, actor_id):
+    actor = service.one("SELECT role FROM users WHERE id=%s", (actor_id,))
+    if not actor or actor["role"] != "GESTOR_ESCOLAR":
+        raise ApiError("Somente gestores escolares podem cadastrar ou alterar turmas e organizar alunos nas turmas.", 403)
+
+
 def admin_membership(service, actor_id, student_id, role, data):
     current = service.one("SELECT * FROM student_school_memberships WHERE student_id=%s FOR UPDATE", (student_id,))
     if role != "USER":
@@ -108,13 +117,13 @@ def admin_membership(service, actor_id, student_id, role, data):
         return
     if "school_id" not in data and "registration_number" not in data:
         return
-    require(service, actor_id, "institutions.update")
     school_id = data.get("school_id", current["school_id"] if current else None)
+    if not current and school_id in (None, ""):
+        return
+    require(service, actor_id, "institutions.update")
     if school_id in [None, ""]:
         if current:
             raise ApiError("Um aluno vinculado deve permanecer em uma unidade. Selecione a unidade de destino.")
-        if data.get("registration_number"):
-            raise ApiError("Selecione a unidade para informar a matricula.")
         return
     school_id = numeric(school_id)
     registration = text(data.get("registration_number", current["registration_number"] if current else ""), "uma matricula", 40, 1)
@@ -134,7 +143,7 @@ def admin_links(service, account):
         return {"linked_schools": units}
     if account["role"] == "USER":
         item = service.one("SELECT m.school_id,s.name,m.registration_number,m.class_id,c.identification AS class_name FROM student_school_memberships m JOIN schools s ON s.id=m.school_id LEFT JOIN school_classes c ON c.id=m.class_id WHERE m.student_id=%s", (account["id"],))
-        return {"linked_schools": [{"id": item["school_id"], "name": item["name"]}] if item else [], "school_id": item["school_id"] if item else None, "registration_number": item["registration_number"] if item else "", "class_id": item["class_id"] if item else None, "class_name": item["class_name"] if item else None}
+        return {"linked_schools": [{"id": item["school_id"], "name": item["name"]}] if item else [], "school_id": item["school_id"] if item else None, "registration_number": account.get("registration_number") or (item["registration_number"] if item else ""), "class_id": item["class_id"] if item else None, "class_name": item["class_name"] if item else None}
     return {"linked_schools": []}
 
 
@@ -145,9 +154,10 @@ def student_progress(service, actor_id, student_id):
         raise ApiError("Aluno nao encontrado nesta unidade.", 404)
     awards = service.all("SELECT achievement_id,created_at FROM achievement_awards WHERE user_id=%s ORDER BY created_at DESC", (student_id,))
     catalog = {item["id"]: item for item in service.achievements(student_id)["conquistas"]}
-    awards = [{**award, "title": catalog.get(award["achievement_id"], {}).get("titulo", award["achievement_id"])} for award in awards]
+    dates = {award["achievement_id"]: award["created_at"] for award in awards}
+    awards = [{"achievement_id": item["id"], "title": item["titulo"], "created_at": dates.get(item["id"])} for item in catalog.values() if item["obtida"]]
     activities = service.all("SELECT tipo,descricao,xp_ganho,created_at FROM activities WHERE user_id=%s ORDER BY created_at DESC,id DESC LIMIT 20", (student_id,))
-    return {"progresso": {**student, "level": max(0, student["xp"]) // 500 + 1, "achievements": awards, "activities": activities}}
+    return {"progresso": {**student, "level": progression(student["xp"])["nivel"], "achievements": awards, "activities": activities}}
 
 
 def class_summary(service, actor_id, class_id):

@@ -110,8 +110,8 @@ export default function Jogos() {
           <div className="h-96 animate-pulse rounded-3xl bg-white/70" />
         </div>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-2">
-          <section className="sea-card rounded-3xl p-5">
+        <div className="adaptive-game-grid grid gap-5">
+          <section className="game-card sea-card rounded-3xl p-4 sm:p-5">
             <GameHeader
               icon={Brain}
               title={memoryMeta?.titulo || "Jogo da memoria"}
@@ -132,14 +132,14 @@ export default function Jogos() {
 
             {memoria ? (
               <>
-                <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4">
+                <div className="memory-board mt-5 grid gap-2 sm:gap-3">
                   {memoria.cards.map((card) => (
                     <button
                       key={card.id}
                       type="button"
                       onClick={() => virarCarta(card.id)}
                       disabled={!can(user, "games.play") || Boolean(memoriaBusy) || card.matched || memoria.completed}
-                      className={`flex aspect-[4/3] items-center justify-center rounded-2xl border px-2 text-center text-sm font-black transition ${
+                      className={`flex min-w-0 aspect-[4/3] items-center justify-center rounded-2xl border px-2 text-center text-sm font-black transition ${
                         card.visible
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                           : "border-sky-100 bg-sky-500 text-white hover:bg-sky-600"
@@ -156,7 +156,7 @@ export default function Jogos() {
             )}
           </section>
 
-          <section className="sea-card rounded-3xl p-5">
+          <section className="game-card sea-card rounded-3xl p-4 sm:p-5">
             <GameHeader
               icon={Puzzle}
               title={puzzleMeta?.titulo || "Quebra-cabeca 3x3"}
