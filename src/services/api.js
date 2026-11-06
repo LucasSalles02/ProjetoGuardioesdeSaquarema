@@ -138,16 +138,22 @@ export const unidadesEscolares = {
 };
 
 export const gestaoEscolar = {
+  async cadastroAluno(id) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/record`); },
+  async alocarAlunos(id, studentIds) { return apiRequest(`/school-management/classes/${encodeURIComponent(id)}/students`, jsonOptions("POST", { student_ids: studentIds })); },
   async progressoAluno(id) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/progress`); },
   async resumoTurma(id) { return apiRequest(`/school-management/classes/${encodeURIComponent(id)}/summary`); },
   async turmas() { return apiRequest("/school-management/classes"); },
   async etapas() { return apiRequest("/school-management/stages"); },
   async alunos() { return apiRequest("/school-management/students"); },
   async salvarTurma(id, dados) { return apiRequest(id ? `/school-management/classes/${encodeURIComponent(id)}` : "/school-management/classes", jsonOptions(id ? "PATCH" : "POST", dados)); },
-  async vincularAluno(id, classId) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/class`, jsonOptions("PATCH", { class_id: classId })); },
+  async vincularAluno(id, classId, expectedClassId) { return apiRequest(`/school-management/students/${encodeURIComponent(id)}/class`, jsonOptions("PATCH", { class_id: classId, ...(expectedClassId !== undefined ? { expected_class_id: expectedClassId } : {}) })); },
 };
 
 export const admin = {
+  async salvarConfiguracaoDestaques(dados) { return apiRequest("/admin/highlights/settings", jsonOptions("PATCH", dados)); },
+  async listarDestaques() { return apiRequest("/admin/highlights"); },
+  async salvarDestaque(id, dados) { return apiRequest(id ? `/admin/highlights/${encodeURIComponent(id)}` : "/admin/highlights", jsonOptions(id ? "PATCH" : "POST", dados)); },
+  async excluirDestaque(id) { return apiRequest(`/admin/highlights/${encodeURIComponent(id)}`, jsonOptions("DELETE")); },
   async reativarUnidade(id) { return apiRequest(`/admin/schools/${encodeURIComponent(id)}/reactivate`, jsonOptions("PATCH", { confirm: true })); },
   async desativarUnidade(id) { return apiRequest(`/admin/schools/${encodeURIComponent(id)}/deactivate`, jsonOptions("PATCH", { confirm: true })); },
   async listarEtapas() { return apiRequest("/admin/school-stages"); },
@@ -205,3 +211,5 @@ export const admin = {
     return apiRequest(`/admin/games/${encodeURIComponent(id)}`, jsonOptions("PATCH", dados));
   },
 };
+
+export const destaques = { async listar() { return apiRequest("/highlights"); } };

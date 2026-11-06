@@ -37,6 +37,8 @@ export default function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="/gestao-escolar" element={<SchoolManagement />} />
           <Route path="/gestao-escolar/turmas" element={<SchoolClasses />} />
+          <Route path="/gestao-escolar/turmas/:classId" element={<SchoolClasses />} />
+          <Route path="/gestao-escolar/alunos" element={<SchoolClasses />} />
           <Route path="/missoes" element={<MissoesDiarias />} />
           <Route path="/aprender" element={<Aprender />} />
           <Route path="/aprender/:moduloId" element={<ModuloAprender />} />
@@ -51,6 +53,7 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}><Route element={<PermissionRoute />}>
           <Route path="/admin/unidades-escolares" element={<AdminSchools />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/destaques" element={<Navigate to="/gestao?aba=destaques" replace />} />
           <Route path="/admin/usuarios" element={<AdminUsers />} />
           <Route path="/admin/usuarios/novo" element={<AdminUserForm />} />
           <Route path="/admin/usuarios/:userId/editar" element={<AdminUsers />} />

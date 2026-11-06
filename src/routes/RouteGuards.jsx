@@ -54,7 +54,7 @@ export function PermissionRoute() {
   const { pathname } = useLocation();
   const permission = routePermission(pathname);
   const schoolArea = pathname.startsWith("/gestao-escolar");
-  const allowed = schoolArea ? (user.role === "GESTOR_ESCOLAR" || (user.admin && can(user, "institutions.read"))) && (can(user, "classes.read") || can(user, "enrollments.read")) : pathname === "/admin/usuarios" ? can(user, "users.read") || can(user, "profiles.read") || can(user, "school_stages.read") : !permission || can(user, permission);
+  const allowed = pathname === "/admin/unidades-escolares" ? can(user, "institutions.read") || can(user, "school_stages.read") : pathname === "/gestao" ? can(user, "content.read") || can(user, "highlights.read") : schoolArea ? (user.role === "GESTOR_ESCOLAR" || (user.admin && can(user, "institutions.read"))) && (can(user, "classes.read") || can(user, "enrollments.read")) : pathname === "/admin/usuarios" ? can(user, "users.read") || can(user, "profiles.read") : !permission || can(user, permission);
   if (!allowed) return <section className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-bold">Acesso restrito</h1><p className="mt-3 text-slate-600">Seu perfil não permite acessar este módulo. Consulte o administrador.</p><Link to="/" className="mt-5 inline-block font-bold text-sky-700">Voltar ao início</Link></section>;
   return <Outlet />;
 }

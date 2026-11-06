@@ -9,11 +9,12 @@ MANAGER_ONLY = {"classes.create", "classes.update", "enrollments.update"}
 
 def module(key, label, roles, actions, reference, scope="platform", implemented=True):
     return {"id": key, "label": label, "roles": roles, "reference": reference, "scope": scope,
-            "actions": [{"id": action, "label": title, "implemented": implemented and action != "delete", "roles": ["GESTOR_ESCOLAR"] if f"{key}.{action}" in MANAGER_ONLY else roles}
+            "actions": [{"id": action, "label": title, "implemented": implemented and (action != "delete" or key == "highlights"), "roles": ["GESTOR_ESCOLAR"] if f"{key}.{action}" in MANAGER_ONLY else roles}
                         for action, title in actions]}
 
 
 CATALOG = [
+    module("highlights", "Destaques da tela inicial", ["ADMIN"], [("read", "Consultar destaques e conteúdos vinculáveis"), ("create", "Criar destaques"), ("update", "Editar e publicar destaques"), ("delete", "Excluir destaques")], "Gerenciamento solicitado pelo usuário"),
     module("learning", "Aprender", ["USER", "ADMIN"], [("read", "Consultar conteúdos"), ("complete", "Concluir aulas")], "RF02, RN12", "own"),
     module("games", "Jogos", ["USER", "ADMIN"], [("read", "Consultar jogos"), ("play", "Jogar e registrar resultado")], "RF03, RN12", "own"),
     module("missions", "Missões diárias", ["USER", "ADMIN"], [("read", "Consultar missões"), ("submit", "Realizar missões")], "RF04, RN12", "own"),
@@ -101,7 +102,7 @@ def save_profile(service, actor_id, data, profile_id=None):
     grants = set(permissions)
     require_delegation(service, actor_id, grants)
     # Write actions depend on a readable screen; reject tampered requests as well.
-    for key in ["learning", "games", "missions", "users", "profiles", "content", "institutions", "school_stages", "classes", "enrollments"]:
+    for key in ["learning", "games", "missions", "users", "profiles", "content", "institutions", "school_stages", "classes", "enrollments", "highlights"]:
         if any(p.startswith(key + ".") and p != key + ".read" for p in grants) and key + ".read" not in grants:
             raise ApiError("Permita consultar o modulo antes de habilitar suas acoes.")
     if "enrollments.update" in grants and "classes.read" not in grants:
@@ -139,6 +140,12 @@ def resolve_profile(service, data, fallback_role="USER", fallback_id=None, actor
 
 
 def route_permission(method, path):
+    if path.startswith("school-management/students/") and path.endswith("/record"):
+        return "enrollments.read"
+    if path.startswith("school-management/classes/") and path.endswith("/students"):
+        return "enrollments.update"
+    if path.startswith("admin/highlights"):
+        return "highlights." + {"GET": "read", "POST": "create", "PATCH": "update", "DELETE": "delete"}[method]
     if path.startswith("school-management/students/") and path.endswith("/progress"):
         return "school_progress.read"
     if path.startswith("school-management/classes/") and path.endswith("/summary"):
