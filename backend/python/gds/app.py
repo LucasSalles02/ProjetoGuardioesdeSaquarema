@@ -47,7 +47,7 @@ def create_app(url=None):
         yield
 
     app = FastAPI(title="Guardiões de Saquarema", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["Content-Type", "Authorization", "X-School-Id"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization", "X-School-Id"])
     app.state.limiter = LoginLimiter()
 
     def execute(method, path, body, bearer, requested_school):
@@ -63,7 +63,7 @@ def create_app(url=None):
                 chunks, size = [], 0
                 async for chunk in request.stream():
                     size += len(chunk)
-                    if size > 100_000:
+                    if size > (1_000_000 if re.fullmatch(r"admin/highlights(?:/[^/]+)?", path) else 100_000):
                         raise ApiError("Payload muito grande.", 413)
                     chunks.append(chunk)
                 raw = b"".join(chunks)

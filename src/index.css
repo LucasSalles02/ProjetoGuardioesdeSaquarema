@@ -33,6 +33,238 @@
 }
 
 @layer components {
+  .home-welcome {
+    background: linear-gradient(125deg, #e0f7fa, #f0f9ff 48%, #d1fae5);
+    min-height: 16rem;
+  }
+
+  .home-landmark-background {
+    width: min(80%, 36rem);
+    opacity: 0.28;
+    display: flex;
+    align-items: center;
+    mask-image: linear-gradient(to right, transparent, black 50%);
+  }
+
+  .home-landmark-background .home-illustration {
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .home-landmark-background figcaption { display: none; }
+  .home-landmark-background svg { min-height: 16rem; }
+  .home-welcome-content { padding-right: 1rem; }
+  .highlight-card { scroll-margin-top: 6rem; }
+  .home-top-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 1.25rem; }
+  .home-top-grid > .home-welcome { height: 100%; }
+  .home-highlights { width: 100%; max-width: 24rem; justify-self: end; }
+  .home-highlights .highlight-card > div:last-child { padding: 1rem; }
+  .home-highlights .highlight-card h3 { font-size: 1rem; }
+  .highlight-dot span { width: 0.5rem; background: #a5d9e6; }
+  .highlight-dot[aria-current="true"] span { width: 1.5rem; background: #0e7490; box-shadow: 0 0 0 3px #cffafe; }
+  @container page (min-width: 48rem) {
+    .home-top-grid { grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem); }
+  }
+  :is([id^="jogo-"], [id^="aula-"], [id^="missao-"]) { scroll-margin-top: 7rem; }
+  :is([id^="jogo-"], [id^="aula-"], [id^="missao-"]):target { outline: 3px solid #0891b2; outline-offset: 4px; }
+
+  @container page (max-width: 40rem) {
+    .home-landmark-background { width: 100%; opacity: 0.16; }
+    .home-welcome-content { padding-right: 0; }
+  }
+
+  .home-card {
+    background-image: linear-gradient(155deg, white 60%, #f0fdfa);
+  }
+
+  .home-primary-button {
+    background: #0e7490;
+    border: 1px solid #0e7490;
+    box-shadow: 0 3px 0 #155e75;
+  }
+
+  .home-primary-button:hover { background: #155e75; }
+  .home-secondary-button { background: rgb(255 255 255 / 0.9); border-color: #a5e4ed; box-shadow: 0 2px 0 #e0f7fa; }
+  .home-secondary-button:hover { background: #e0f7fa; border-color: #67e8f9; }
+  .home-primary-button:focus-visible, .home-secondary-button:focus-visible { outline: 2px solid #0369a1; outline-offset: 4px; }
+  .home-action-icon { border: 2px solid white; box-shadow: 0 3px 0 #e0f7fa; }
+  .home-module-icon { box-shadow: 0 4px 0 #e0f7fa; }
+  .home-mini-metric > div:first-child { border: 1px solid #cffafe; box-shadow: 0 3px 0 #e0f7fa; }
+  .home-progress-card { border-color: #a5e4ed; }
+
+  .home-eco-card {
+    background: linear-gradient(125deg, #075985, #0f766e);
+    border: 2px solid white;
+  }
+
+  .home-eco-card::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    width: 130%;
+    height: 4rem;
+    bottom: -2.5rem;
+    left: -15%;
+    border: 1px solid rgb(165 243 252 / 0.35);
+    border-radius: 50%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .home-primary-button, .home-secondary-button, .home-stat, .home-action-card, .home-module-card { transition: background-color 180ms ease, box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease; }
+    .home-action-icon svg, .home-module-icon, .home-card-arrow { transition: transform 200ms ease; }
+    .home-primary-button:active, .home-secondary-button:active { transform: translateY(2px); }
+    .home-stat:hover, .home-action-card:hover, .home-module-card:hover { transform: translateY(-3px); box-shadow: 0 7px 18px -9px rgb(0 96 100 / 0.28); }
+    .home-action-card:hover .home-action-icon svg { transform: rotate(-4deg) scale(1.04); }
+    .home-action-card:hover .home-card-arrow { transform: translateX(2px); }
+    .home-module-card:hover .home-module-icon { transform: rotate(-3deg); }
+    .home-progress-fill { transform-origin: left; animation: progress-reveal 700ms ease-out; transition: width 600ms ease; }
+    .home-clouds { animation: home-cloud-drift 12s ease-in-out infinite alternate; }
+    .home-sea-ripples { animation: navigation-wave-drift 9s ease-in-out infinite alternate; }
+    .home-turtle { animation: home-turtle-swim 8s ease-in-out infinite; }
+    .home-fish { animation: home-fish-swim 10s ease-in-out -3s infinite; }
+    .home-recycle-token { animation: home-recycle-glow 7s ease-in-out infinite; }
+    .home-tree { transform-box: fill-box; transform-origin: bottom center; animation: home-tree-sway 9s ease-in-out infinite alternate; }
+    .home-sea-plants { transform-box: fill-box; transform-origin: bottom center; animation: home-tree-sway 6s ease-in-out infinite alternate; }
+    .home-birds { animation: home-cloud-drift 16s ease-in-out infinite alternate-reverse; }
+    .home-sea-bubbles { animation: home-bubbles-rise 7s ease-in-out infinite; }
+    .home-sun { transform-box: fill-box; transform-origin: center; animation: home-sun-glow 10s ease-in-out infinite; }
+    .highlight-card { transition: transform 180ms ease, box-shadow 180ms ease; }
+    a.highlight-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px -10px rgb(0 96 100 / 0.3); }
+    .highlight-spark { animation: home-sun-glow 8s ease-in-out infinite; }
+    .highlight-dot span { transition: width 250ms ease, background-color 250ms ease, box-shadow 250ms ease; }
+    .highlight-slide { animation: highlight-slide-enter 350ms ease-out; }
+  }
+
+  .progress-hero {
+    background: linear-gradient(120deg, #e0f7fa, #d1fae5);
+  }
+
+  .progress-panel {
+    border: 1px solid #d7edf1;
+    background: white;
+    box-shadow: 0 4px 0 rgb(178 235 242 / 0.22);
+  }
+
+  .progress-current-badge .level-badge { width: 4rem; height: 4rem; border-width: 3px; }
+  .progress-collection-badge .level-badge { width: 3.5rem; height: 3.5rem; border-width: 3px; }
+  .progress-meter-fill { background: linear-gradient(90deg, #059669, #34d399); }
+  .progress-meter-fill[data-tone="blue"] { background: linear-gradient(90deg, #0369a1, #38bdf8); }
+  .progress-meter-fill[data-tone="aqua"] { background: linear-gradient(90deg, #0e7490, #2dd4bf); }
+  .progress-level-map { grid-template-columns: repeat(auto-fit, minmax(min(100%, 2.75rem), 1fr)); }
+
+  @container page (min-width: 20rem) {
+    .progress-level-map { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
+
+  @container page (min-width: 44rem) {
+    .progress-level-map { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  }
+
+  .progress-level-stop { border-color: #e2e8f0; color: #64748b; background: #f8fafc; }
+  .progress-level-stop[data-reached="true"] { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+  .progress-level-stop[aria-pressed="true"] { border-color: #0891b2; background: #e0f7fa; color: #155e75; box-shadow: 0 3px 0 #b2ebf2; }
+  .progress-level-stop:hover { border-color: #0891b2; }
+  .progress-chart { container-type: inline-size; container-name: progress-chart; }
+  .progress-week-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .progress-day { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.25rem; }
+  .progress-day-value, .progress-day-label { font-size: 0.625rem; }
+  .progress-day-track { height: 8rem; }
+  .progress-day[aria-pressed="true"] { background: #e0f7fa; box-shadow: 0 0 0 1px #67e8f9; }
+  .progress-day:hover { background: #f0fdfa; }
+  .progress-day-fill { width: 100%; height: var(--day-percent); }
+
+  @container progress-chart (max-width: 24rem) {
+    .progress-week-grid { grid-template-columns: minmax(0, 1fr); }
+    .progress-day { display: grid; grid-template-columns: 2rem minmax(0, 1fr) 3rem; gap: 0.5rem; min-height: 2.75rem; padding: 0.4rem; }
+    .progress-day-label { order: 1; font-size: 0.75rem; }
+    .progress-day-track { order: 2; height: 0.65rem; display: block; }
+    .progress-day-value { order: 3; font-size: 0.7rem; text-align: right; }
+    .progress-day-fill { display: block; width: var(--day-percent); height: 100%; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .progress-meter-fill { transform-origin: left; animation: progress-reveal 650ms ease-out both; transition: width 650ms ease; }
+    .progress-day-fill { transform-origin: bottom; animation: progress-bar-rise 500ms ease-out both; animation-delay: var(--bar-delay, 0ms); }
+    .progress-stat, .progress-day, .progress-level-stop { transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+    .progress-stat:hover { transform: translateY(-3px); }
+    .progress-collection-badge { animation: progress-badge-reveal 300ms ease-out both; }
+    .progress-sailboat { animation: progress-sail 7s ease-in-out infinite; transform-origin: center; }
+    .progress-water { animation: navigation-wave-drift 6s ease-in-out infinite alternate; }
+    @container progress-chart (max-width: 24rem) {
+      .progress-day-fill { animation-name: progress-reveal; transform-origin: left; }
+    }
+  }
+
+  .ocean-navigation {
+    background: linear-gradient(165deg, #f0fdfa 0%, #f0f9ff 38%, #fff 68%, #e0f7fa 100%);
+  }
+
+  .ocean-nav-glow {
+    background: radial-gradient(circle, rgb(103 232 249 / 0.24), transparent 70%);
+  }
+
+  .ocean-nav-brand-icon {
+    background: linear-gradient(135deg, #0891b2, #0f766e);
+    box-shadow: 0 3px 0 #b2ebf2;
+  }
+
+  .ocean-nav-bubble {
+    position: absolute;
+    border: 1px solid rgb(0 151 167 / 0.15);
+    background: rgb(255 255 255 / 0.65);
+    border-radius: 50%;
+  }
+
+  .ocean-nav-bubble--one { right: 12%; top: 24%; width: 14px; height: 14px; --nav-drift-delay: -1s; }
+  .ocean-nav-bubble--two { left: 8%; top: 56%; width: 9px; height: 9px; --nav-drift-delay: -5s; }
+  .ocean-nav-bubble--three { right: 18%; bottom: 17%; width: 20px; height: 20px; --nav-drift-delay: -8s; }
+
+  .ocean-nav-link {
+    min-height: 3.5rem;
+    color: #475569;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .ocean-nav-icon {
+    border-color: #e0f2fe;
+    background: rgb(255 255 255 / 0.9);
+    color: #0e7490;
+  }
+
+  .ocean-nav-marker { background: #14b8a6; opacity: 0; }
+  .ocean-nav-link:hover { background: rgb(255 255 255 / 0.8); border-color: #b2ebf2; color: #006064; }
+  .ocean-nav-link:hover .ocean-nav-icon { border-color: #99f6e4; color: #0f766e; }
+
+  .ocean-nav-link[data-active="true"] {
+    color: #0c4a6e;
+    border-color: #a5e4ed;
+    background: linear-gradient(110deg, #e0f7fa, #fff 85%);
+    box-shadow: 0 3px 0 rgb(178 235 242 / 0.55);
+  }
+
+  .ocean-nav-link[data-active="true"] .ocean-nav-icon {
+    color: white;
+    border-color: white;
+    background: linear-gradient(135deg, #0891b2, #0f766e);
+    box-shadow: 0 2px 0 #b2ebf2;
+  }
+
+  .ocean-nav-link[data-active="true"] .ocean-nav-marker { opacity: 1; }
+  .ocean-nav-link[data-collapsed="true"] { justify-content: center; padding: 6px; min-height: 3.25rem; }
+  .ocean-nav-control:hover { border-color: #99f6e4; background: #f0fdfa; color: #0f766e; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ocean-nav-link, .ocean-nav-control { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+    .ocean-nav-icon { transition: transform 180ms ease, border-color 180ms ease, color 180ms ease; }
+    .ocean-nav-link:hover .ocean-nav-icon { transform: translateY(-1px) rotate(-3deg); }
+    .ocean-nav-bubble { animation: navigation-bubble-drift 12s ease-in-out infinite; animation-delay: var(--nav-drift-delay); }
+    .ocean-nav-wave { animation: navigation-wave-drift 16s ease-in-out infinite alternate; }
+  }
+
   .page-shell { container-type: inline-size; container-name: page; }
   .page-heading h1 { font-size: clamp(1.35rem, 1.08rem + 1vw, 1.875rem); }
   .app-topbar { padding-top: max(0.75rem, env(safe-area-inset-top)); }
@@ -506,3 +738,58 @@
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }
 }
+
+@keyframes navigation-bubble-drift {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-16px); opacity: 0.9; }
+}
+
+@keyframes navigation-wave-drift {
+  from { transform: translateX(-6px); }
+  to { transform: translateX(6px); }
+}
+
+@keyframes progress-reveal {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes progress-bar-rise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes progress-sail {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+
+@keyframes progress-badge-reveal {
+  from { transform: scale(0.9) rotate(-5deg); opacity: 0.4; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes home-cloud-drift {
+  from { transform: translateX(-5px); }
+  to { transform: translateX(5px); }
+}
+
+@keyframes home-turtle-swim {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(7px, -3px); }
+}
+
+@keyframes home-fish-swim {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-9px); }
+}
+
+@keyframes home-recycle-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes home-tree-sway { from { transform: rotate(-1deg); } to { transform: rotate(1deg); } }
+@keyframes highlight-slide-enter { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes home-bubbles-rise { 0%, 100% { transform: translateY(0); opacity: 0.6; } 50% { transform: translateY(-5px); opacity: 1; } }
+@keyframes home-sun-glow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }

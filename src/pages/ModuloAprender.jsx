@@ -12,12 +12,14 @@ import PageShell from "../components/PageShell";
 import { aprendizado } from "../services/api";
 import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
+import useContentAnchor from "../hooks/useContentAnchor";
 
 export default function ModuloAprender() {
   const { moduloId } = useParams();
   const { user, atualizarUsuario } = useAuth();
   const [modulo, setModulo] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  useContentAnchor(!carregando && Boolean(modulo));
   const [concluindo, setConcluindo] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [respostas, setRespostas] = useState({});
@@ -131,7 +133,7 @@ export default function ModuloAprender() {
 
       <div className="space-y-3">
         {modulo.lessons.map((lesson) => (
-          <article key={lesson.id} className="sea-card rounded-3xl p-5">
+          <article key={lesson.id} id={`aula-${lesson.id}`} tabIndex={-1} className="sea-card rounded-3xl p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex min-w-0 flex-1 basis-64 gap-3">
                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${

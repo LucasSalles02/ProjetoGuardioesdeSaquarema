@@ -1,5 +1,13 @@
 """Progression defined in RN21-RN26 of the updated technical report."""
+import json
+from pathlib import Path
+
+LEVEL_NAMES = {item["nivelNecessario"]: item["titulo"] for item in json.loads((Path(__file__).parent / "data" / "seed.json").read_text(encoding="utf-8"))["achievements"]}
 THRESHOLDS = (0, 100, 200, 300, 400, 550, 700, 850, 1000, 1200)
+
+
+def level_name(level):
+    return LEVEL_NAMES.get(level, f"Nível {level}")
 
 
 def progression(xp):

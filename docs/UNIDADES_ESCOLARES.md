@@ -68,4 +68,18 @@ A tela `/selecionar-unidade` permite escolher apenas unidades autorizadas, atual
 
 A API valida a unidade ativa antes de fornecer dados escolares. Mesmo uma outra escola autorizada ao gestor não pode ser consultada como dado de trabalho sem antes trocar o contexto. A lista de unidades para seleção, autenticação e troca de senha são operações anteriores ao contexto; turmas e relatórios usam a mesma validação institucional.
 
+## Etapas e organização de turmas
+
+O cadastro de etapas está em **Administrador → Gerenciar Unidades Escolares → Etapas Escolares**. A aba reutiliza o cadastro existente: etapas continuam compartilhadas pelas unidades, sem duplicação de registros ou alteração das turmas já vinculadas. As permissões `school_stages.read/create/update` permanecem as mesmas. Um perfil com acesso somente às etapas pode abrir o módulo sem receber acesso aos cadastros de unidades. Usuários e Perfis contém apenas seus respectivos gerenciamentos.
+
+Em **Gestão → Gestão de Turmas e Alunos**, a aba **Turmas** apresenta a lista da unidade ativa. Selecionar uma turma abre `/gestao-escolar/turmas/{id}`, com os alunos atualmente alocados, pesquisa e consolidado pedagógico. **Todos os alunos** (`/gestao-escolar/alunos`) preserva a pesquisa por nome/matrícula, o filtro por turma e o progresso individual e acrescenta a consulta de cadastro.
+
+Somente gestores com `enrollments.update` podem organizar alunos. **Acrescentar alunos à turma** oferece os alunos ativos da unidade sem turma; é possível selecionar até 200 por operação. Alunos já alocados usam **Transferir de turma**, com destino restrito a outra turma da mesma unidade. **Remover da turma** solicita confirmação e limpa apenas a turma: escola, matrícula, dados cadastrais, XP, conquistas e histórico são preservados. O administrador usa as mesmas listas, detalhes, cadastros e relatórios, sem ações de escrita.
+
+- `POST /api/school-management/classes/{id}/students`, com `{"student_ids":["id-aluno"]}`: alocação em lote. Exige `enrollments.update`, gestor e contexto válido. Todos os alunos devem estar ativos, sem turma e na unidade atual; qualquer conflito rejeita toda a operação, sem alocação parcial.
+- `PATCH /api/school-management/students/{id}/class`, com `{"class_id":null,"expected_class_id":123}`: remove a turma. Um destino numérico aloca/transfere. O campo opcional `expected_class_id` protege contra alterações simultâneas: se a turma atual mudou, retorna HTTP 409 e exige atualizar a lista.
+- `GET /api/school-management/students/{id}/record`: consulta cadastral com `enrollments.read`, contexto ativo e aluno da mesma unidade. Retorna nome, matrícula, nascimento, perfil, situação, datas cadastrais, escola, turma, etapa e contatos dos responsáveis. Nunca retorna credenciais de autenticação. Os contatos são de uso institucional restrito.
+
+Todas as mudanças de turma usam `student_school_memberships` e registram `class_enrollment_events`. As telas atualizam a mesma fonte de alunos e os totais das turmas; não existem vínculos paralelos. Esta reorganização não exige nova migração nem recadastramento dos alunos existentes.
+
 O cabeçalho `X-School-Id` confirma o contexto esperado pelo navegador; ele não concede autorização nem substitui o valor armazenado na sessão. Um contexto divergente retorna 409 com `UNIDADE_DESATUALIZADA`. A ausência ou revogação da unidade retorna 409 com `UNIDADE_OBRIGATORIA`; a interface atualiza o contexto e exige nova seleção. Erros ao selecionar uma unidade não autorizada preservam a seleção anterior. Respostas iniciadas no contexto anterior são descartadas pelo cliente.

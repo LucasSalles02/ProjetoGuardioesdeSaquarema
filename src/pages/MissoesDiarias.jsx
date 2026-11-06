@@ -4,11 +4,13 @@ import PageShell from "../components/PageShell";
 import { missoes as missoesAPI } from "../services/api";
 import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
+import useContentAnchor from "../hooks/useContentAnchor";
 
 export default function MissoesDiarias() {
   const { user, atualizarUsuario } = useAuth();
   const [missoes, setMissoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  useContentAnchor(!carregando);
   const [concluindo, setConcluindo] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [respostas, setRespostas] = useState({});
@@ -108,6 +110,7 @@ export default function MissoesDiarias() {
           {missoes.map((missao) => (
             <article
               key={missao.id}
+              id={`missao-${missao.id}`} tabIndex={-1}
               className={`sea-card rounded-3xl p-5 transition ${
                 missao.concluida ? "bg-emerald-50" : "bg-white"
               }`}

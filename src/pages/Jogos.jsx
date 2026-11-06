@@ -4,12 +4,14 @@ import PageShell from "../components/PageShell";
 import { jogos as jogosAPI } from "../services/api";
 import { can } from "../services/permissions";
 import { useAuth } from "../context/AuthContext";
+import useContentAnchor from "../hooks/useContentAnchor";
 
 export default function Jogos() {
   const { user, atualizarUsuario } = useAuth();
   const [catalogo, setCatalogo] = useState([]);
   const [feedback, setFeedback] = useState("");
   const [carregando, setCarregando] = useState(true);
+  useContentAnchor(!carregando);
 
   const [memoriaId, setMemoriaId] = useState("");
   const [memoria, setMemoria] = useState(null);
@@ -111,7 +113,7 @@ export default function Jogos() {
         </div>
       ) : (
         <div className="adaptive-game-grid grid gap-5">
-          <section className="game-card sea-card rounded-3xl p-4 sm:p-5">
+          <section id="jogo-memory" tabIndex={-1} className="game-card sea-card rounded-3xl p-4 sm:p-5">
             <GameHeader
               icon={Brain}
               title={memoryMeta?.titulo || "Jogo da memoria"}
@@ -156,7 +158,7 @@ export default function Jogos() {
             )}
           </section>
 
-          <section className="game-card sea-card rounded-3xl p-4 sm:p-5">
+          <section id="jogo-puzzle" tabIndex={-1} className="game-card sea-card rounded-3xl p-4 sm:p-5">
             <GameHeader
               icon={Puzzle}
               title={puzzleMeta?.titulo || "Quebra-cabeca 3x3"}

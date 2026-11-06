@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, Gamepad2, Layers3, Loader2, Plus, Save, Target } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, BookOpen, Gamepad2, Layers3, Loader2, Megaphone, Plus, Save, Target } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../services/permissions";
 import PageShell from "../components/PageShell";
 import { admin as adminAPI } from "../services/api";
+
+import AdminHighlights from "./AdminHighlights";
 
 const emptyMission = {
   titulo: "",
@@ -40,7 +42,11 @@ const emptyLesson = {
 
 export default function GestaoConteudo() {
   const [conteudo, setConteudo] = useState({ missoes: [], modulos: [], jogos: [] });
-  const [aba, setAba] = useState("missoes");
+  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get("aba");
+  const aba = requestedTab === "destaques" ? (can(user, "highlights.read") ? "destaques" : "missoes") : can(user, "content.read") ? (["missoes", "modulos", "aulas", "jogos"].includes(requestedTab) ? requestedTab : "missoes") : "destaques";
+  const setAba = value => setParams({ aba: value });
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -63,10 +69,11 @@ export default function GestaoConteudo() {
   };
 
   useEffect(() => {
+    if (!can(user, "content.read")) { setCarregando(false); return; }
     carregar()
       .catch((error) => setFeedback(error.message || "Nao foi possivel carregar a gestao."))
       .finally(() => setCarregando(false));
-  }, []);
+  }, [user]);
 
   const aulas = useMemo(() => (
     conteudo.modulos.flatMap((modulo) => (
@@ -140,13 +147,14 @@ export default function GestaoConteudo() {
       ) : null}
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <TabButton active={aba === "missoes"} icon={Target} label="Missoes" onClick={() => setAba("missoes")} />
+        {can(user, "content.read") && <><TabButton active={aba === "missoes"} icon={Target} label="Missoes" onClick={() => setAba("missoes")} />
         <TabButton active={aba === "modulos"} icon={Layers3} label="Modulos" onClick={() => setAba("modulos")} />
         <TabButton active={aba === "aulas"} icon={BookOpen} label="Aulas" onClick={() => setAba("aulas")} />
-        <TabButton active={aba === "jogos"} icon={Gamepad2} label="Jogos" onClick={() => setAba("jogos")} />
+        <TabButton active={aba === "jogos"} icon={Gamepad2} label="Jogos" onClick={() => setAba("jogos")} /></>}
+        {can(user, "highlights.read") && <TabButton active={aba === "destaques"} icon={Megaphone} label="Destaques" onClick={() => setAba("destaques")} />}
       </div>
 
-      {carregando ? (
+      {aba === "destaques" ? <AdminHighlights embedded /> : carregando ? (
         <div className="h-80 animate-pulse rounded-3xl bg-white/70" />
       ) : (
         <>

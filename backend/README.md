@@ -165,6 +165,8 @@ backend/
 
 ## Unidades Escolares e vínculos
 
+O gerenciamento da divulgação na tela inicial é documentado em [Destaques: cadastro, imagens, permissões e API](../docs/DESTAQUES.md). A migração `014_home_highlights.sql` cria a estrutura vazia, sem conteúdos ou imagens de exemplo.
+
 A migração `006_school_units.sql` implementa Escola e VinculoGestorEscola. A listagem do gestor usa os vínculos autorizados da conta autenticada; editar o cadastro de usuário ou um campo de escola em texto não concede esse acesso. Consulte [API, permissões e campos](../docs/UNIDADES_ESCOLARES.md).
 
 A migração `007_session_school_context.sql` mantém a unidade ativa por sessão. `GET/POST /api/school-context` consultam/trocam a seleção; `GET /api/school-current` retorna somente a unidade ativa autorizada. Um novo login exige nova escolha; recarregar a mesma sessão preserva a seleção após validar o vínculo. Os códigos `UNIDADE_OBRIGATORIA` e `UNIDADE_DESATUALIZADA` retornam HTTP 409 e atualizam o seletor no navegador.

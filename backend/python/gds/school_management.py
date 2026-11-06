@@ -1,5 +1,5 @@
 """School-scoped classes and single-class memberships, RF15-17 and RN03-06/14-15."""
-from .progression import progression
+from .progression import progression, level_name
 from .errors import ApiError
 from .schools import _id
 from .access import require
@@ -82,24 +82,63 @@ def save_class(service, actor_id, data, class_id=None):
 
 def students(service, actor_id):
     school_id = scoped_school(service, actor_id)
-    return {"alunos": service.all("SELECT u.id,u.nome,m.registration_number,m.class_id,c.identification AS class_name,s.name AS stage_name FROM student_school_memberships m JOIN users u ON u.id=m.student_id LEFT JOIN school_classes c ON c.id=m.class_id LEFT JOIN school_stages s ON s.id=c.stage_id WHERE m.school_id=%s AND u.role='USER' AND u.active=TRUE ORDER BY lower(u.nome),u.id", (school_id,))}
+    rows = service.all("SELECT u.id,u.nome,m.registration_number,m.class_id,c.identification AS class_name,s.name AS stage_name,COALESCE(st.xp,0) AS xp FROM student_school_memberships m JOIN users u ON u.id=m.student_id LEFT JOIN stats st ON st.user_id=u.id LEFT JOIN school_classes c ON c.id=m.class_id LEFT JOIN school_stages s ON s.id=c.stage_id WHERE m.school_id=%s AND u.role='USER' AND u.active=TRUE ORDER BY lower(u.nome),u.id", (school_id,))
+    for row in rows:
+        row["level"] = progression(row.pop("xp"))["nivel"]
+        row["level_name"] = level_name(row["level"])
+    return {"alunos": rows}
 
 
 def assign_class(service, actor_id, student_id, data):
     require_manager_write(service, actor_id)
     school_id = scoped_school(service, actor_id)
-    if set(data) != {"class_id"}:
+    if "class_id" not in data or set(data) - {"class_id", "expected_class_id"}:
         raise ApiError("Informe somente a turma. Nao e permitido alterar XP, niveis ou dados cadastrais.")
-    class_id = numeric(data.get("class_id"))
+    class_id = numeric(data["class_id"]) if data["class_id"] is not None else None
     current = service.one("SELECT m.class_id FROM student_school_memberships m JOIN users u ON u.id=m.student_id WHERE m.student_id=%s AND m.school_id=%s AND u.role='USER' AND u.active=TRUE FOR UPDATE OF m", (student_id, school_id))
     if not current:
         raise ApiError("Aluno nao encontrado nesta unidade.", 404)
-    if not service.one("SELECT id FROM school_classes WHERE id=%s AND school_id=%s", (class_id, school_id)):
+    if "expected_class_id" in data:
+        expected = numeric(data["expected_class_id"]) if data["expected_class_id"] is not None else None
+        if expected != current["class_id"]:
+            raise ApiError("A turma do aluno foi alterada. Atualize a listagem antes de continuar.", 409)
+    if class_id is not None and not service.one("SELECT id FROM school_classes WHERE id=%s AND school_id=%s", (class_id, school_id)):
         raise ApiError("Turma nao encontrada nesta unidade.", 404)
     if current["class_id"] != class_id:
         service.db.execute("UPDATE student_school_memberships SET class_id=%s,updated_at=CURRENT_TIMESTAMP WHERE student_id=%s AND school_id=%s", (class_id, student_id, school_id))
         service.db.execute("INSERT INTO class_enrollment_events(student_id,school_id,from_class_id,to_class_id,actor_id) VALUES (%s,%s,%s,%s,%s)", (student_id, school_id, current["class_id"], class_id, actor_id))
     return {"aluno": next(row for row in students(service, actor_id)["alunos"] if row["id"] == student_id)}
+
+
+def allocate_students(service, actor_id, class_id, data):
+    """Allocate unassigned students atomically; transfers use the individual endpoint."""
+    require_manager_write(service, actor_id)
+    require(service, actor_id, "enrollments.update")
+    school_id = scoped_school(service, actor_id)
+    class_id = numeric(class_id)
+    ids = data.get("student_ids")
+    if set(data) != {"student_ids"} or not isinstance(ids, list) or not 1 <= len(ids) <= 200 or any(not isinstance(i, str) or not i for i in ids) or len(set(ids)) != len(ids):
+        raise ApiError("Selecione de 1 a 200 alunos diferentes para alocar.")
+    if not service.one("SELECT id FROM school_classes WHERE id=%s AND school_id=%s", (class_id, school_id)):
+        raise ApiError("Turma nao encontrada nesta unidade.", 404)
+    members = service.all("SELECT m.student_id,m.class_id FROM student_school_memberships m JOIN users u ON u.id=m.student_id WHERE m.student_id=ANY(%s) AND m.school_id=%s AND u.role='USER' AND u.active=TRUE ORDER BY m.student_id FOR UPDATE OF m", (ids, school_id))
+    if len(members) != len(ids):
+        raise ApiError("Um ou mais alunos não estão disponíveis nesta unidade. Atualize a lista.", 404)
+    if any(m["class_id"] is not None for m in members):
+        raise ApiError("Um ou mais alunos já possuem turma. Atualize a lista ou utilize Transferir de turma.", 409)
+    for member in members:
+        service.db.execute("UPDATE student_school_memberships SET class_id=%s,updated_at=CURRENT_TIMESTAMP WHERE student_id=%s AND school_id=%s", (class_id, member["student_id"], school_id))
+        service.db.execute("INSERT INTO class_enrollment_events(student_id,school_id,from_class_id,to_class_id,actor_id) VALUES (%s,%s,NULL,%s,%s)", (member["student_id"], school_id, class_id, actor_id))
+    return {**students(service, actor_id), **classes(service, actor_id)}
+
+
+def student_record(service, actor_id, student_id):
+    school_id = scoped_school(service, actor_id)
+    # Explicit fields: never expose authentication credentials or other schools' records.
+    record = service.one("SELECT u.id,u.nome,u.role,u.active,TO_CHAR(u.birth_date,'DD/MM/YYYY') AS birth_date,u.guardians,u.created_at,u.updated_at,u.deactivated_at,COALESCE(u.access_profile_id,u.role) AS profile_id,p.name AS profile_name,m.registration_number,m.school_id,sch.name AS school_name,m.class_id,c.identification AS class_name,s.name AS stage_name FROM student_school_memberships m JOIN users u ON u.id=m.student_id JOIN schools sch ON sch.id=m.school_id JOIN access_profiles p ON p.id=COALESCE(u.access_profile_id,u.role) LEFT JOIN school_classes c ON c.id=m.class_id LEFT JOIN school_stages s ON s.id=c.stage_id WHERE m.school_id=%s AND m.student_id=%s AND u.role='USER' AND u.active=TRUE", (school_id, student_id))
+    if not record:
+        raise ApiError("Aluno nao encontrado nesta unidade.", 404)
+    return {"aluno": record}
 
 
 def require_manager_write(service, actor_id):
@@ -155,9 +194,11 @@ def student_progress(service, actor_id, student_id):
     awards = service.all("SELECT achievement_id,created_at FROM achievement_awards WHERE user_id=%s ORDER BY created_at DESC", (student_id,))
     catalog = {item["id"]: item for item in service.achievements(student_id)["conquistas"]}
     dates = {award["achievement_id"]: award["created_at"] for award in awards}
-    awards = [{"achievement_id": item["id"], "title": item["titulo"], "created_at": dates.get(item["id"])} for item in catalog.values() if item["obtida"]]
+    awards = [{"achievement_id": item["id"], "title": item["titulo"], "level": item["nivelNecessario"], "created_at": dates.get(item["id"])} for item in catalog.values() if item["obtida"]]
     activities = service.all("SELECT tipo,descricao,xp_ganho,created_at FROM activities WHERE user_id=%s ORDER BY created_at DESC,id DESC LIMIT 20", (student_id,))
-    return {"progresso": {**student, "level": progression(student["xp"])["nivel"], "achievements": awards, "activities": activities}}
+    current = progression(student["xp"])
+    extra = service.one("SELECT COALESCE(jogos_concluidos,0) AS games_completed,COALESCE(sequencia_dias,0) AS streak_days FROM stats WHERE user_id=%s", (student_id,)) or {"games_completed": 0, "streak_days": 0}
+    return {"progresso": {**student, **extra, "level": current["nivel"], "level_name": level_name(current["nivel"]), "progress": current, "achievements": awards, "activities": activities}}
 
 
 def class_summary(service, actor_id, class_id):

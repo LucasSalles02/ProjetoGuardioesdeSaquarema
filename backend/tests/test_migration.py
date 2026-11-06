@@ -171,7 +171,7 @@ def test_pbkdf2_compatibility(client, account, db_url, password):
 def test_migrations_idempotent_and_checksum_guard(db_url):
     migrate(db_url)
     with connection(db_url) as db:
-        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 13
+        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 15
         db.execute("UPDATE schema_migrations SET checksum='invalid'")
     with pytest.raises(RuntimeError, match="foi alterada"):
         migrate(db_url)

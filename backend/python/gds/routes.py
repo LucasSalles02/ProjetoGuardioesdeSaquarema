@@ -1,10 +1,18 @@
 import re
 
 from .errors import ApiError
-from . import access, schools, school_management
+from . import access, schools, school_management, highlights
 
 # HTTP contracts deliberately retain the URLs and Portuguese envelopes used by React.
 ROUTES = [
+    ("GET", r"school-management/students/([^/]+)/record", lambda s, u, b, p: school_management.student_record(s, u, p[0])),
+    ("POST", r"school-management/classes/([^/]+)/students", lambda s, u, b, p: school_management.allocate_students(s, u, p[0], b)),
+    ("GET", r"highlights", lambda s, u, b, p: highlights.listing(s, u)),
+    ("GET", r"admin/highlights", lambda s, u, b, p: highlights.listing(s, u, True)),
+    ("POST", r"admin/highlights", lambda s, u, b, p: highlights.save(s, u, b)),
+    ("PATCH", r"admin/highlights/settings", lambda s, u, b, p: highlights.save_settings(s, u, b)),
+    ("PATCH", r"admin/highlights/([^/]+)", lambda s, u, b, p: highlights.save(s, u, b, p[0])),
+    ("DELETE", r"admin/highlights/([^/]+)", lambda s, u, b, p: highlights.delete(s, u, p[0])),
     ("PATCH", r"admin/schools/([^/]+)/reactivate", lambda s, u, b, p: schools.reactivate(s, u, p[0], b)),
     ("PATCH", r"admin/schools/([^/]+)/deactivate", lambda s, u, b, p: schools.deactivate(s, u, p[0], b)),
     ("GET", r"school-management/students/([^/]+)/progress", lambda s, u, b, p: school_management.student_progress(s, u, p[0])),
@@ -87,7 +95,7 @@ def dispatch(service, method, path, body, bearer, requested_school=""):
         if verb == method and match:
             # Acquire before authenticate() locks the actor: concurrent administrators
             # deactivating one another cannot deadlock or remove the last active admin.
-            if (path.startswith("admin/") or path.startswith("school-management/")) and method in ["POST", "PATCH"]:
+            if (path.startswith("admin/") or path.startswith("school-management/")) and method in ["POST", "PATCH", "DELETE"]:
                 service.db.execute("SELECT pg_advisory_xact_lock(18022029)")
             user_id = service.authenticate(bearer, (method, path) in [("GET", "auth/me"), ("POST", "auth/first-access/password")])
             permission = access.route_permission(method, path)

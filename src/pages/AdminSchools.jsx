@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Eye, Loader2, Pencil, Plus, RefreshCw, School, Search, ShieldCheck, ShieldOff } from "lucide-react";
 import { Link } from "react-router-dom";
 import PageShell from "../components/PageShell";
+import SchoolStagesPanel from "../components/admin/SchoolStagesPanel";
 import AdminDialog from "../components/admin/AdminDialog";
 import { admin } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -12,6 +13,7 @@ const inputClass = "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3
 
 export default function AdminSchools() {
   const { user } = useAuth();
+  const [area, setArea] = useState(can(user, "institutions.read") ? "units" : "stages");
   const { refreshSchools } = useSchool();
   const [pendingReactivate, setPendingReactivate] = useState(null);
   const [reactivating, setReactivating] = useState(false);
@@ -35,6 +37,7 @@ export default function AdminSchools() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!can(user, "institutions.read")) { setLoading(false); return; }
     let active = true;
     setLoading(true); setError("");
     Promise.all([admin.listarUnidades(), admin.listarGestoresUnidades()])
@@ -42,7 +45,7 @@ export default function AdminSchools() {
       .catch(err => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, user]);
 
   useEffect(() => {
     if (!dialog?.id) return;
@@ -105,6 +108,8 @@ export default function AdminSchools() {
 
   return <PageShell title="Gerenciar Unidades Escolares" description="Cadastre unidades e autorize os gestores que poderão consultá-las.">
     <Link to="/admin/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-sky-700"><ArrowLeft size={17} aria-hidden="true" /> Voltar à Administração</Link>
+    <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Gerenciamentos escolares">{[["units", "Unidades Escolares", "institutions.read"], ["stages", "Etapas Escolares", "school_stages.read"]].filter(([, , permission]) => can(user, permission)).map(([key, label]) => <button key={key} type="button" onClick={() => setArea(key)} aria-pressed={area === key} className={`rounded-xl px-4 py-2.5 text-sm font-bold ${area === key ? "bg-sky-600 text-white" : "border border-slate-200 bg-white text-sky-700"}`}>{label}</button>)}</div>
+    {area === "stages" ? <SchoolStagesPanel /> : <>
     <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="schools-title">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="schools-title" className="text-xl font-black">Unidades Escolares</h2><p className="mt-1 text-sm text-slate-500">{schools.filter(item => item.active !== false).length} ativas · {schools.filter(item => item.active === false).length} desativadas</p></div><div className="flex flex-wrap gap-2"><button type="button" disabled={loading} onClick={() => setAttempt(value => value + 1)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-sky-700 disabled:opacity-40"><RefreshCw size={16} aria-hidden="true" /> Atualizar</button>{can(user, "institutions.create") && <button type="button" disabled={loading || Boolean(error)} onClick={() => open("create")} className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Plus size={17} aria-hidden="true" /> Cadastrar unidade</button>}</div></div>
       <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Situação das unidades">{[["active", "Unidades ativas"], ["inactive", "Unidades desativadas"]].map(([key, label]) => <button key={key} type="button" onClick={() => { setTab(key); setQuery(""); }} aria-pressed={tab === key} className={`rounded-xl px-4 py-2.5 text-sm font-bold ${tab === key ? "bg-sky-600 text-white" : "border border-slate-200 text-sky-700"}`}>{label}</button>)}</div>
@@ -129,5 +134,6 @@ export default function AdminSchools() {
         <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => setDialog(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold">{readonly ? "Fechar" : "Cancelar"}</button>{!readonly && <button type="submit" disabled={saving || Boolean(dialog.id && !form.id)} className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">{saving ? "Salvando..." : "Salvar unidade"}</button>}</div>
       </form>}
     </AdminDialog>}
+    </>}
   </PageShell>;
 }

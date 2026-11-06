@@ -160,3 +160,87 @@ def test_missing_scope_and_read_only_profile_are_enforced(client, admin_headers,
     assert client.patch("/api/school-management/students/missing/class", headers=headers, json={"class_id": 1}).status_code == 403
     new_session = client.post("/api/auth/login", json={"cpf": "88123456789", "senha": "segredo123"}).json()["token"]
     assert client.get("/api/school-management/classes", headers={"Authorization": "Bearer " + new_session}).status_code == 409
+
+
+def test_bulk_allocation_removal_transfer_and_record_preserve_school_and_progress(client, admin_headers, school_setup, db_url):
+    setup, headers = school_setup, school_setup["headers"]
+    school = setup["units"][0]["id"]
+    first = student(client, admin_headers, school, guardians=[{"name": "Contato Familiar", "relationship": "Responsável", "phone": "22999999999"}]).json()["usuario"]
+    second = student(client, admin_headers, school, "two").json()["usuario"]
+    a, b = classroom(client, setup).json()["turma"], classroom(client, setup, "Turma B").json()["turma"]
+    with connection(db_url) as db:
+        db.execute("UPDATE stats SET xp=725,missoes_concluidas=3 WHERE user_id=%s", (first["id"],))
+    response = client.post(f"/api/school-management/classes/{a['id']}/students", headers=headers, json={"student_ids": [first["id"], second["id"]]})
+    assert response.status_code == 200, response.text
+    assert all(row["class_id"] == a["id"] for row in response.json()["alunos"])
+    assert next(row for row in response.json()["turmas"] if row["id"] == a["id"])["student_count"] == 2
+    path = f"/api/school-management/students/{first['id']}/class"
+    removed = client.patch(path, headers=headers, json={"class_id": None, "expected_class_id": a["id"]})
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["aluno"]["class_id"] is None
+    assert client.patch(f"/api/school-management/students/{second['id']}/class", headers=headers, json={"class_id": b["id"], "expected_class_id": a["id"]}).status_code == 200
+    # A stale removal must never undo a newer class assignment.
+    assert client.patch(path, headers=headers, json={"class_id": None, "expected_class_id": a["id"]}).status_code == 409
+    record = client.get(f"/api/school-management/students/{first['id']}/record", headers=headers)
+    assert record.status_code == 200, record.text
+    account = record.json()["aluno"]
+    assert account["school_id"] == school and account["class_id"] is None
+    assert account["birth_date"] == "01/01/2015" and account["registration_number"] == "000one"
+    assert account["guardians"][0]["name"] == "Contato Familiar"
+    assert not {"password_hash", "password_salt", "cpf", "username", "token", "must_change_password"} & account.keys()
+    with connection(db_url) as db:
+        assert db.execute("SELECT xp FROM stats WHERE user_id=%s", (first["id"],)).fetchone()["xp"] == 725
+        membership = db.execute("SELECT school_id,class_id FROM student_school_memberships WHERE student_id=%s", (first["id"],)).fetchone()
+        assert membership == {"school_id": school, "class_id": None}
+        events = db.execute("SELECT from_class_id,to_class_id FROM class_enrollment_events WHERE student_id=%s ORDER BY id", (first["id"],)).fetchall()
+        assert events == [{"from_class_id": None, "to_class_id": a["id"]}, {"from_class_id": a["id"], "to_class_id": None}]
+    counts = {row["id"]: row["student_count"] for row in client.get("/api/school-management/classes", headers=headers).json()["turmas"]}
+    assert counts[a["id"]] == 0 and counts[b["id"]] == 1
+    assert len(client.get("/api/school-management/students", headers=headers).json()["alunos"]) == 2
+
+
+def test_bulk_allocation_is_atomic_and_validates_candidates(client, admin_headers, school_setup):
+    setup, headers = school_setup, school_setup["headers"]
+    first = student(client, admin_headers, setup["units"][0]["id"]).json()["usuario"]
+    second = student(client, admin_headers, setup["units"][0]["id"], "two").json()["usuario"]
+    other = student(client, admin_headers, setup["units"][1]["id"], "three").json()["usuario"]
+    group = classroom(client, setup).json()["turma"]
+    path = f"/api/school-management/classes/{group['id']}/students"
+    assert client.post(path, headers=headers, json={"student_ids": [first["id"], other["id"]]}).status_code == 404
+    assert all(s["class_id"] is None for s in client.get("/api/school-management/students", headers=headers).json()["alunos"])
+    for invalid in [[], [first["id"], first["id"]], [True], "student", ["x"]*201]:
+        assert client.post(path, headers=headers, json={"student_ids": invalid}).status_code == 400
+    assert client.post(path, headers=headers, json={"student_ids": [first["id"]], "school_id": other["school_id"]}).status_code == 400
+    assert client.post(path, headers=headers, json={"student_ids": [first["id"]]}).status_code == 200
+    assert client.post(path, headers=headers, json={"student_ids": [first["id"], second["id"]]}).status_code == 409
+    rows = client.get("/api/school-management/students", headers=headers).json()["alunos"]
+    assert next(row for row in rows if row["id"] == second["id"])["class_id"] is None
+
+
+def test_student_records_and_bulk_operations_are_school_scoped_and_admin_read_only(client, admin_headers, school_setup):
+    setup, headers = school_setup, school_setup["headers"]
+    local = student(client, admin_headers, setup["units"][0]["id"]).json()["usuario"]
+    other = student(client, admin_headers, setup["units"][1]["id"], "two").json()["usuario"]
+    group = classroom(client, setup).json()["turma"]
+    assert client.get(f"/api/school-management/students/{other['id']}/record", headers=headers).status_code == 404
+    assert client.post("/api/school-context", headers=headers, json={"school_id": setup["units"][1]["id"]}).status_code == 200
+    assert client.get(f"/api/school-management/students/{local['id']}/record", headers=headers).status_code == 404
+    assert client.post(f"/api/school-management/classes/{group['id']}/students", headers=headers, json={"student_ids": [other["id"]]}).status_code == 404
+    assert client.post("/api/school-context", headers=admin_headers, json={"school_id": setup["units"][0]["id"]}).status_code == 200
+    assert client.get(f"/api/school-management/students/{local['id']}/record", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/school-management/students/{other['id']}/record", headers=admin_headers).status_code == 404
+    assert client.patch(f"/api/school-management/students/{local['id']}/class", headers=admin_headers, json={"class_id": None}).status_code == 403
+    assert client.post(f"/api/school-management/classes/{group['id']}/students", headers=admin_headers, json={"student_ids": [local["id"]]}).status_code == 403
+
+
+def test_concurrent_transfer_and_removal_reject_stale_class(client, admin_headers, school_setup, db_url):
+    setup, headers = school_setup, school_setup["headers"]
+    account = student(client, admin_headers, setup["units"][0]["id"]).json()["usuario"]
+    a, b = classroom(client, setup).json()["turma"], classroom(client, setup, "Turma B").json()["turma"]
+    path = f"/api/school-management/students/{account['id']}/class"
+    assert client.patch(path, headers=headers, json={"class_id": a["id"]}).status_code == 200
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda destination: client.patch(path, headers=headers, json={"class_id": destination, "expected_class_id": a["id"]}), [None, b["id"]]))
+    assert sorted(r.status_code for r in results) == [200, 409]
+    with connection(db_url) as db:
+        assert db.execute("SELECT COUNT(*) AS n FROM class_enrollment_events WHERE student_id=%s", (account["id"],)).fetchone()["n"] == 2
