@@ -11,7 +11,11 @@ def school_setup(client, admin_headers, db_url):
     with connection(db_url) as db:
         manager = Service(db).register({"nome": "Gestor Turmas", "email": "gestorturmas@example.com", "senha": "segredo123"})
         db.execute("UPDATE users SET role='GESTOR_ESCOLAR',cpf='88123456789' WHERE id=%s", (manager["usuario"]["id"],))
-    units = [client.post("/api/admin/schools", headers=admin_headers, json={"name": name, "manager_ids": [manager["usuario"]["id"]]}).json()["unidade"] for name in ["Escola Um", "Escola Dois"]]
+    units = []
+    for name in ["Escola Um", "Escola Dois"]:
+        response = client.post("/api/admin/schools", headers=admin_headers, json={"name": name, "manager_ids": [manager["usuario"]["id"]]})
+        assert response.status_code == 200, response.text
+        units.append(response.json()["unidade"])
     headers = {"Authorization": "Bearer " + manager["token"]}
     assert client.post("/api/school-context", headers=headers, json={"school_id": units[0]["id"]}).status_code == 200
     stages = client.get("/api/school-management/stages", headers=headers).json()["etapas"]

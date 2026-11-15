@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import closing
 import json
 import os
 import secrets
@@ -138,7 +139,7 @@ def test_import_refuses_nonempty_target(db_url, legacy_source, tmp_path):
 
 def test_import_rolls_back_on_invalid_record(db_url, legacy_source, tmp_path):
     source, _ = legacy_source
-    with sqlite3.connect(source) as db:
+    with closing(sqlite3.connect(source)) as db, db:
         db.execute("UPDATE activities SET xp_ganho='invalid'")
     with pytest.raises(Exception):
         import_sqlite(source, db_url, tmp_path / "backups")
@@ -197,3 +198,26 @@ def test_migrations_idempotent_and_checksum_guard(db_url):
         db.execute("UPDATE schema_migrations SET checksum='invalid'")
     with pytest.raises(RuntimeError, match="foi alterada"):
         migrate(db_url)
+
+
+def test_import_closes_all_sqlite_connections(legacy_source,tmp_path,monkeypatch):
+    connections = []
+    connect = sqlite3.connect
+
+    class TrackedConnection(sqlite3.Connection):
+        closed = False
+
+        def close(self):
+            self.closed = True
+            super().close()
+
+    def tracked_connect(*args,**kwargs):
+        result = connect(*args,**kwargs,factory=TrackedConnection)
+        connections.append(result)
+        return result
+
+    monkeypatch.setattr(sqlite3,"connect",tracked_connect)
+    result = import_sqlite(legacy_source[0],backup_directory=tmp_path/"closed-backups",dry_run=True)
+    assert result["dry_run"]
+    assert len(connections) == 3
+    assert all(connection.closed for connection in connections)

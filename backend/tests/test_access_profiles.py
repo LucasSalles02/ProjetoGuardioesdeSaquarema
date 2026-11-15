@@ -28,6 +28,10 @@ def test_documented_profiles_and_school_boundaries(client, admin_headers):
     assert "transfers.execute" not in grants
     assert not {"classes.create", "classes.update", "enrollments.update"} & set(profiles["ADMIN"]["permissions"])
     assert {"classes.create", "classes.update", "enrollments.update"} <= set(grants)
+    modules = {module["id"]: module for module in result.json()["modulos"]}
+    assert modules["learning"]["reference"] == "RF03"
+    assert modules["highlights"]["reference"] == "RF24"
+    assert modules["profiles"]["reference"].startswith("RF25")
     for module in result.json()["modulos"]:
         if module["scope"] == "school" and module["id"] not in ["school_units", "classes", "enrollments", "school_progress", "transfers"]:
             assert not any(a["implemented"] for a in module["actions"])

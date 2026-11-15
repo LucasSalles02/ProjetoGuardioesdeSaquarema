@@ -1,5 +1,6 @@
 """Transactional, verified import; source SQLite is never modified."""
 import hashlib
+from contextlib import closing
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -25,12 +26,12 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
     backup_directory.mkdir(parents=True, exist_ok=True)
     backup = backup_directory / f"{source_path.stem}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.sqlite"
     # sqlite backup API includes committed WAL pages and works on a live source.
-    with sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True) as source:
+    with closing(sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True)) as source:
         if source.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("SQLite de origem nao passou na verificacao de integridade.")
-        with sqlite3.connect(backup) as target:
+        with closing(sqlite3.connect(backup)) as target:
             source.backup(target)
-    with sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True) as source:
+    with closing(sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True)) as source:
         source.row_factory = sqlite3.Row
         existing = {row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         data = {table: [dict(row) for row in source.execute(f'SELECT * FROM "{table}"')] if table in existing else [] for table in TABLES}
