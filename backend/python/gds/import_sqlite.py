@@ -9,7 +9,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from .database import connection, migrate
-from .time import now
+from .time import now, day
 
 TABLES = ["users", "stats", "sessions", "activities", "missions", "modules", "lessons", "games_catalog",
           "mission_submissions", "lesson_submissions", "achievement_awards", "game_sessions"]
@@ -53,6 +53,21 @@ def import_sqlite(source_path, url=None, backup_directory=None, dry_run=False):
         row.setdefault("registration_number", None)
         row.setdefault("guardians", [])
         row.setdefault("initial_credential_version", 0)
+        row.setdefault("temporary_password_expires_at", None)
+    for row in data["games_catalog"]:
+        row.setdefault("daily_reward_limit", 1)
+    for row in data["missions"]:
+        row.setdefault("icon", None)
+        row.setdefault("repeatable", True)
+        row.setdefault("available_from", None)
+        row.setdefault("available_until", None)
+    for row in data["lessons"]:
+        row.setdefault("icon", None)
+    for table in ("mission_submissions", "lesson_submissions", "game_sessions"):
+        for row in data[table]:
+            row.setdefault("xp_awarded", None)
+    for row in data["game_sessions"]:
+        row.setdefault("reward_date_key", day(datetime.fromisoformat((row["completed_at"] or row["created_at"]).replace("Z", "+00:00"))) if row["reward_granted"] else None)
     for row in data["sessions"]:
         row.setdefault("school_id", None)
     # Translate future rewards to RN28 without touching accumulated XP/history.

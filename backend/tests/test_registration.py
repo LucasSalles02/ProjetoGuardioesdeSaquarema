@@ -40,6 +40,6 @@ def test_administrator_can_still_create_user(client, admin_headers, db_url):
     assert user["cpf"] == data["cpf"]
     with connection(db_url) as db:
         assert db.execute("SELECT COUNT(*) AS n FROM registration_requests").fetchone()["n"] == 0
-    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": data["registration_number"]})
+    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": result.json()["temporary_credential"]["password"]})
     assert login.status_code == 200
     assert login.json()["usuario"]["id"] == user["id"]

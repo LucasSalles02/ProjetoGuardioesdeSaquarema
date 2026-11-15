@@ -22,10 +22,14 @@ def test_documented_profiles_and_school_boundaries(client, admin_headers):
     assert "progress.read" not in grants  # School reports never imply access to another person's own progress.
     assert "missions.submit" in profiles["USER"]["permissions"]
     assert "users.create" in profiles["ADMIN"]["permissions"]
+    assert {"transfers.read", "transfers.create"} <= set(grants)
+    assert {"transfers.read", "transfers.review", "transfers.execute"} <= set(profiles["ADMIN"]["permissions"])
+    assert "transfers.create" not in profiles["ADMIN"]["permissions"]
+    assert "transfers.execute" not in grants
     assert not {"classes.create", "classes.update", "enrollments.update"} & set(profiles["ADMIN"]["permissions"])
     assert {"classes.create", "classes.update", "enrollments.update"} <= set(grants)
     for module in result.json()["modulos"]:
-        if module["scope"] == "school" and module["id"] not in ["school_units", "classes", "enrollments", "school_progress"]:
+        if module["scope"] == "school" and module["id"] not in ["school_units", "classes", "enrollments", "school_progress", "transfers"]:
             assert not any(a["implemented"] for a in module["actions"])
 
 
@@ -69,7 +73,7 @@ def test_assignment_enforcement_and_session_revocation(client, admin_headers, db
     created = client.post("/api/admin/users", headers=admin_headers, json=data)
     assert created.status_code == 200, created.text
     assert created.json()["usuario"]["profile_name"] == profile["name"]
-    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": data["registration_number"]})
+    login = client.post("/api/auth/login", json={"registration_number": data["registration_number"], "senha": created.json()["temporary_credential"]["password"]})
     initial_headers = {"Authorization": "Bearer " + login.json()["token"]}
     password = "NovaSenha12345"
     setup = client.post("/api/auth/first-access/password", headers=initial_headers, json={"novaSenha": password, "confirmarSenha": password})

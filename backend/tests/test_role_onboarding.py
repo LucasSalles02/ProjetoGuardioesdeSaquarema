@@ -9,7 +9,7 @@ def student(client, headers, **changes):
     payload = {"nome": "Aluno Matricula", "username": "aluno.matricula", "role": "USER", "registration_number": "00001234", **changes}
     result = client.post("/api/admin/users", headers=headers, json=payload)
     assert result.status_code == 200, result.text
-    return result.json()["usuario"]
+    return {**result.json()["usuario"], "temporary_password": result.json()["temporary_credential"]["password"]}
 
 
 def sign_in(client, registration_number, password):
@@ -23,7 +23,7 @@ def test_student_without_cpf_or_email_and_guardian_privacy(client, admin_headers
     assert created["registration_number"] == "00001234" and created["guardians"] == [contact]
     assert created["school_id"] is None  # Enrollment survives temporary lack of a school.
     assert sign_in(client, created["registration_number"], "1234").status_code == 401
-    login = sign_in(client, created["registration_number"], "00001234")
+    login = sign_in(client, created["registration_number"], created["temporary_password"])
     assert login.status_code == 200 and login.json()["usuario"]["must_change_password"]
     assert "guardians" not in login.json()["usuario"]
     headers = {"Authorization": "Bearer " + login.json()["token"]}
@@ -39,46 +39,51 @@ def test_student_without_cpf_or_email_and_guardian_privacy(client, admin_headers
         assert row["password_hash"].startswith("scrypt$")
 
 
-def test_student_reset_uses_enrollment_and_revokes_sessions(client, admin_headers):
+def test_student_random_reset_revokes_sessions(client, admin_headers):
     created = student(client, admin_headers)
-    login = sign_in(client, created["registration_number"], "00001234").json()
+    login = sign_in(client, created["registration_number"], created["temporary_password"]).json()
     headers = {"Authorization": "Bearer " + login["token"]}
     assert client.post("/api/auth/first-access/password", headers=headers, json={"novaSenha": "00001234", "confirmarSenha": "00001234"}).status_code == 400
     setup = client.post("/api/auth/first-access/password", headers=headers, json={"novaSenha": "Pessoal1234", "confirmarSenha": "Pessoal1234"}).json()
     assert sign_in(client, created["registration_number"], "Pessoal1234").status_code == 200
-    assert client.post(f"/api/admin/users/{created['id']}/reset-password", headers=admin_headers).status_code == 200
+    reset = client.post(f"/api/admin/users/{created['id']}/reset-password", headers=admin_headers)
+    assert reset.status_code == 200
     assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + setup["token"]}).status_code == 401
     assert sign_in(client, created["registration_number"], "Pessoal1234").status_code == 401
-    assert sign_in(client, created["registration_number"], "00001234").json()["usuario"]["must_change_password"]
+    assert sign_in(client, created["registration_number"], reset.json()["temporary_credential"]["password"]).json()["usuario"]["must_change_password"]
 
 
 def test_edit_enrollment_pending_and_personal_passwords(client, admin_headers):
     created = student(client, admin_headers)
     path = f"/api/admin/users/{created['id']}"
-    assert client.patch(path, headers=admin_headers, json={"registration_number": "00005678"}).status_code == 200
+    edited = client.patch(path, headers=admin_headers, json={"registration_number": "00005678"})
+    assert edited.status_code == 200
     assert sign_in(client, created["registration_number"], "00001234").status_code == 401
-    login = sign_in(client, "00005678", "00005678").json()
+    login = sign_in(client, "00005678", edited.json()["temporary_credential"]["password"]).json()
     setup = client.post("/api/auth/first-access/password", headers={"Authorization": "Bearer " + login["token"]}, json={"novaSenha": "Pessoal1234", "confirmarSenha": "Pessoal1234"})
     assert setup.status_code == 200
     assert client.patch(path, headers=admin_headers, json={"registration_number": "00009999"}).status_code == 200
     assert sign_in(client, "00009999", "Pessoal1234").status_code == 200
     assert sign_in(client, "00009999", "00009999").status_code == 401
-    assert client.post(path + "/reset-password", headers=admin_headers).status_code == 200
-    assert sign_in(client, "00009999", "00009999").status_code == 200
+    reset = client.post(path + "/reset-password", headers=admin_headers)
+    assert reset.status_code == 200
+    assert sign_in(client, "00009999", reset.json()["temporary_credential"]["password"]).status_code == 200
 
 
 @pytest.mark.parametrize("role", ["GESTOR_ESCOLAR", "ADMIN"])
-def test_staff_require_cpf_and_use_it_for_first_access_and_reset(client, admin_headers, role):
+def test_staff_cpf_login_with_random_first_access_and_reset(client, admin_headers, role):
     data = {"nome": "Profissional Ficticio", "username": "profissional", "email": "profissional@example.com", "role": role}
     assert client.post("/api/admin/users", headers=admin_headers, json=data).status_code == 400
     data["cpf"] = "00123456789"
-    created = client.post("/api/admin/users", headers=admin_headers, json=data).json()["usuario"]
+    issued = client.post("/api/admin/users", headers=admin_headers, json=data).json()
+    created = issued["usuario"]
     path = "/api/auth/admin/login" if role == "ADMIN" else "/api/auth/login"
-    login = client.post(path, json={"cpf": "001.234.567-89", "senha": "001.234.567-89"})
+    login = client.post(path, json={"cpf": "001.234.567-89", "senha": issued["temporary_credential"]["password"]})
     assert login.status_code == 200
-    assert client.post(f"/api/admin/users/{created['id']}/reset-password", headers=admin_headers).status_code == 200
+    reset = client.post(f"/api/admin/users/{created['id']}/reset-password", headers=admin_headers)
+    assert reset.status_code == 200
     assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + login.json()["token"]}).status_code == 401
-    assert client.post(path, json={"cpf": "00123456789", "senha": "00123456789"}).status_code == 200
+    assert client.post(path, json={"cpf": "00123456789", "senha": reset.json()["temporary_credential"]["password"]}).status_code == 200
 
 
 @pytest.mark.parametrize("changes", [
@@ -107,7 +112,9 @@ def test_legacy_pending_upgrade_and_completed_password_preservation(client, admi
     migrate(db_url)
     assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + session}).status_code == 401
     assert sign_in(client, pending["registration_number"], "00123456789").status_code == 401
-    assert sign_in(client, pending["registration_number"], "00001234").status_code == 200
+    assert sign_in(client, pending["registration_number"], "00001234").status_code == 401
+    reset = client.post(f"/api/admin/users/{pending['id']}/reset-password", headers=admin_headers)
+    assert sign_in(client, pending["registration_number"], reset.json()["temporary_credential"]["password"]).status_code == 200
     assert sign_in(client, completed["registration_number"], "Pessoal1234").status_code == 200
     with connection(db_url) as db:
         assert db.execute("SELECT password_hash FROM users WHERE id=%s", (completed["id"],)).fetchone()["password_hash"] == before
@@ -121,5 +128,6 @@ def test_legacy_without_enrollment_cannot_reset_until_corrected(client, admin_he
     assert client.post(path + "/reset-password", headers=admin_headers).status_code == 400
     assert sign_in(client, "legado", "Pessoal1234").status_code == 401
     assert client.patch(path, headers=admin_headers, json={"registration_number": "00008888"}).status_code == 200
-    assert client.post(path + "/reset-password", headers=admin_headers).status_code == 200
-    assert sign_in(client, "00008888", "00008888").status_code == 200
+    reset = client.post(path + "/reset-password", headers=admin_headers)
+    assert reset.status_code == 200
+    assert sign_in(client, "00008888", reset.json()["temporary_credential"]["password"]).status_code == 200

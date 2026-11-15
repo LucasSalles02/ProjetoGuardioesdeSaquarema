@@ -110,12 +110,18 @@ def test_admin_school_transfer_removes_old_class_and_preserves_history(client, a
     group = classroom(client, setup).json()["turma"]
     client.patch(f"/api/school-management/students/{account['id']}/class", headers=headers, json={"class_id": group["id"]})
     updated = client.patch(f"/api/admin/users/{account['id']}", headers=admin_headers, json={"school_id": setup["units"][1]["id"], "registration_number": "0002"})
-    assert updated.status_code == 200, updated.text
-    assert updated.json()["usuario"]["class_id"] is None
+    assert updated.status_code == 409
+    payload = {"student_id": account["id"], "destination_school_id": setup["units"][1]["id"], "justification": "Mudanca escolar autorizada"}
+    request = client.post("/api/school-management/transfers",headers=headers,json=payload)
+    assert request.status_code == 200,request.text
+    transfer_id = request.json()["solicitacao"]["id"]
+    assert client.post(f"/api/admin/transfers/{transfer_id}/approve",headers=admin_headers,json={}).status_code == 200
+    assert client.post(f"/api/admin/transfers/{transfer_id}/execute",headers=admin_headers,json={"confirm": True}).status_code == 200
+    assert client.get(f"/api/admin/users/{account['id']}",headers=admin_headers).json()["usuario"]["class_id"] is None
     assert client.get("/api/school-management/students", headers=headers).json()["alunos"] == []
     assert client.get(f"/api/school-management/students/{account['id']}/progress", headers=headers).status_code == 404
     client.post("/api/school-context", headers=headers, json={"school_id": setup["units"][1]["id"]})
-    assert client.get("/api/school-management/students", headers=headers).json()["alunos"][0]["registration_number"] == "0002"
+    assert client.get("/api/school-management/students", headers=headers).json()["alunos"][0]["registration_number"] == "000one"
 
 
 def test_manager_units_visible_to_admin(client, admin_headers, school_setup):

@@ -3,15 +3,13 @@ from .identity import cpf_digits
 from .errors import ApiError
 from .security import email, hash_password, identifier, profile, token
 from .time import now
+from .onboarding import initial_secret, issue_temporary
+from .service import Service
 
 
 def provision_admin(db, reset=False):
-    if reset:
-        raise ApiError("Realize o reset pelo painel administrativo. A senha inicial volta a ser o CPF cadastrado.")
     cpf = cpf_digits(project_env("ADMIN_CPF", ""))
-    password = project_env("ADMIN_PASSWORD", "")
-    if not 12 <= len(password) <= 256:
-        raise ApiError("Defina ADMIN_CPF (11 digitos) e ADMIN_PASSWORD (12-256 caracteres) no ambiente local.")
+    password = initial_secret()
     db.execute("SELECT pg_advisory_xact_lock(18022028)")
     existing = db.execute("SELECT id,role,active FROM users WHERE cpf=%s FOR UPDATE", (cpf,)).fetchone()
     if existing:
@@ -19,7 +17,9 @@ def provision_admin(db, reset=False):
             raise ApiError("CPF ja utilizado por outra categoria de conta.")
         if not existing["active"]:
             raise ApiError("A conta administrativa esta desativada. O provisionamento nao reativa contas.")
-        return
+        return issue_temporary(Service(db), existing["id"]) if reset else None
+    if reset:
+        raise ApiError("Administrador nao encontrado. Provisione a conta antes de redefinir sua senha.")
     safe = profile({"nome": project_env("ADMIN_NAME") or "Administrador", "email": project_env("ADMIN_EMAIL"), "senha": password})
     legacy = db.execute("SELECT id,role,active,cpf FROM users WHERE email=%s FOR UPDATE", (email(safe["email"]),)).fetchone()
     if legacy and legacy["role"] == "ADMIN" and legacy["active"] and legacy["cpf"] is None:
@@ -34,3 +34,4 @@ def provision_admin(db, reset=False):
     db.execute("INSERT INTO users (id,nome,cpf,email,role,password_salt,password_hash,created_at,updated_at) VALUES (%s,%s,%s,%s,'ADMIN',%s,%s,%s,%s)",
                (user_id, safe["nome"], cpf, safe["email"], salt, hash_password(password, salt), stamp, stamp))
     db.execute("INSERT INTO stats (user_id) VALUES (%s)", (user_id,))
+    return issue_temporary(Service(db), user_id)

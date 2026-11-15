@@ -27,8 +27,11 @@ def main():
         elif args.command == "admin":
             migrate()
             with connection() as db:
-                provision_admin(db, args.reset_password)
+                credential = provision_admin(db, args.reset_password)
             print("Administrador provisionado.")
+            if credential:
+                print("Senha temporaria (entrega administrativa): " + credential["password"])
+                print("Valida ate: " + credential["expires_at"] + ". Troca obrigatoria no primeiro acesso.")
         else:
             with connection() as db:
                 db.execute("SELECT 1")

@@ -1,4 +1,7 @@
+import asyncio
 import logging
+from datetime import datetime, timedelta
+from contextlib import suppress
 import re
 import threading
 import time
@@ -14,6 +17,8 @@ from .database import connection, migrate
 from .errors import ApiError
 from .routes import dispatch
 from .service import Service
+from .daily_missions import ensure_catalog
+from .time import ZONE
 
 LOGGER = logging.getLogger("guardioes.api")
 
@@ -40,11 +45,36 @@ def create_app(url=None):
             await run_in_threadpool(migrate, url)
             def seed():
                 with connection(url) as db:
-                    Service(db).seed()
+                    service = Service(db)
+                    service.seed()
+                    ensure_catalog(service)
             await run_in_threadpool(seed)
         except Exception as exc:
             raise RuntimeError(f"Nao foi possivel preparar PostgreSQL ({type(exc).__name__}). Verifique DATABASE_URL e execute db:migrate.") from None
-        yield
+        def renew():
+            with connection(url) as db:
+                ensure_catalog(Service(db))
+
+        async def renew_at_midnight():
+            while True:
+                current = datetime.now(ZONE)
+                midnight = (current + timedelta(days=1)).replace(hour=0,minute=0,second=0,microsecond=0)
+                await asyncio.sleep((midnight-current).total_seconds())
+                while True:
+                    try:
+                        await run_in_threadpool(renew)
+                        break
+                    except Exception as exc:
+                        LOGGER.error("Falha na renovacao diaria: %s",type(exc).__name__)
+                        await asyncio.sleep(30)
+
+        renewal = asyncio.create_task(renew_at_midnight())
+        try:
+            yield
+        finally:
+            renewal.cancel()
+            with suppress(asyncio.CancelledError):
+                await renewal
 
     app = FastAPI(title="Guardiões de Saquarema", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization", "X-School-Id"])
@@ -79,7 +109,7 @@ def create_app(url=None):
                 app.state.limiter.check(request.client.host if request.client else "unknown")
             match = re.fullmatch(r"Bearer\s+(.+)", request.headers.get("authorization", ""), re.IGNORECASE)
             result = await run_in_threadpool(execute, request.method, path, body, match.group(1) if match else "", request.headers.get("x-school-id", ""))
-            return JSONResponse(result)
+            return JSONResponse(result, headers={"Cache-Control": "no-store"})
         except ApiError as exc:
             return JSONResponse({"erro": str(exc), **({"codigo": exc.code} if exc.code else {})}, status_code=exc.status)
         except psycopg.errors.UniqueViolation:

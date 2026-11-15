@@ -5,15 +5,16 @@ from .security import identifier
 from .time import now
 from psycopg.types.json import Jsonb
 
-MANAGER_ONLY = {"classes.create", "classes.update", "enrollments.update"}
+MANAGER_ONLY = {"classes.create", "classes.update", "enrollments.update", "transfers.create"}
 
 def module(key, label, roles, actions, reference, scope="platform", implemented=True):
     return {"id": key, "label": label, "roles": roles, "reference": reference, "scope": scope,
-            "actions": [{"id": action, "label": title, "implemented": implemented and (action != "delete" or key == "highlights"), "roles": ["GESTOR_ESCOLAR"] if f"{key}.{action}" in MANAGER_ONLY else roles}
+            "actions": [{"id": action, "label": title, "implemented": implemented and (action != "delete" or key == "highlights"), "roles": ["GESTOR_ESCOLAR"] if f"{key}.{action}" in MANAGER_ONLY else ["ADMIN"] if key == "transfers" and action in ("review", "execute") else roles}
                         for action, title in actions]}
 
 
 CATALOG = [
+    module("transfers", "Transferências entre unidades", ["GESTOR_ESCOLAR", "ADMIN"], [("read", "Consultar solicitações"), ("create", "Solicitar transferência"), ("review", "Analisar e decidir solicitações"), ("execute", "Executar transferências aprovadas")], "RF22, RN41–RN42, RN49", "school"),
     module("highlights", "Destaques da tela inicial", ["ADMIN"], [("read", "Consultar destaques e conteúdos vinculáveis"), ("create", "Criar destaques"), ("update", "Editar e publicar destaques"), ("delete", "Excluir destaques")], "Gerenciamento solicitado pelo usuário"),
     module("learning", "Aprender", ["USER", "ADMIN"], [("read", "Consultar conteúdos"), ("complete", "Concluir aulas")], "RF02, RN12", "own"),
     module("games", "Jogos", ["USER", "ADMIN"], [("read", "Consultar jogos"), ("play", "Jogar e registrar resultado")], "RF03, RN12", "own"),
@@ -102,9 +103,11 @@ def save_profile(service, actor_id, data, profile_id=None):
     grants = set(permissions)
     require_delegation(service, actor_id, grants)
     # Write actions depend on a readable screen; reject tampered requests as well.
-    for key in ["learning", "games", "missions", "users", "profiles", "content", "institutions", "school_stages", "classes", "enrollments", "highlights"]:
+    for key in ["learning", "games", "missions", "users", "profiles", "content", "institutions", "school_stages", "classes", "enrollments", "highlights", "transfers"]:
         if any(p.startswith(key + ".") and p != key + ".read" for p in grants) and key + ".read" not in grants:
             raise ApiError("Permita consultar o modulo antes de habilitar suas acoes.")
+    if role == "GESTOR_ESCOLAR" and "transfers.read" in grants and "school_units.read" not in grants:
+        raise ApiError("Transferencias exigem consultar as unidades autorizadas.")
     if "enrollments.update" in grants and "classes.read" not in grants:
         raise ApiError("Organizar alunos exige consultar as turmas.")
     if "school_progress.read" in grants and "enrollments.read" not in grants:
@@ -140,6 +143,10 @@ def resolve_profile(service, data, fallback_role="USER", fallback_id=None, actor
 
 
 def route_permission(method, path):
+    if path.startswith("admin/transfers"):
+        return "transfers.read" if method == "GET" else "transfers.execute" if path.endswith("/execute") else "transfers.review"
+    if path.startswith("school-management/transfers"):
+        return "transfers.create" if method == "POST" or path.endswith("/options") else "transfers.read"
     if path.startswith("school-management/students/") and path.endswith("/record"):
         return "enrollments.read"
     if path.startswith("school-management/classes/") and path.endswith("/students"):

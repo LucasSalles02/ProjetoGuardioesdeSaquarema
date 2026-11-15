@@ -170,7 +170,9 @@ def admin_membership(service, actor_id, student_id, role, data):
         raise ApiError("Unidade escolar nao encontrada.", 404)
     if service.one("SELECT student_id FROM student_school_memberships WHERE school_id=%s AND registration_number=%s AND student_id<>%s", (school_id, registration, student_id)):
         raise ApiError("Ja existe um aluno com essa matricula na unidade.")
-    class_id = current["class_id"] if current and current["school_id"] == school_id else None
+    if current and current["school_id"] != school_id:
+        raise ApiError("A mudanca entre unidades exige solicitacao do gestor e transferencia aprovada no modulo de Transferencias.", 409)
+    class_id = current["class_id"] if current else None
     if current and current["class_id"] and class_id is None:
         service.db.execute("INSERT INTO class_enrollment_events(student_id,school_id,from_class_id,to_class_id,actor_id) VALUES (%s,%s,%s,NULL,%s)", (student_id, current["school_id"], current["class_id"], actor_id))
     service.db.execute("INSERT INTO student_school_memberships(student_id,school_id,registration_number,class_id) VALUES (%s,%s,%s,%s) ON CONFLICT(student_id) DO UPDATE SET school_id=EXCLUDED.school_id,registration_number=EXCLUDED.registration_number,class_id=EXCLUDED.class_id,updated_at=CURRENT_TIMESTAMP", (student_id, school_id, registration, class_id))

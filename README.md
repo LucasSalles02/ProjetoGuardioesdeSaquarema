@@ -17,7 +17,7 @@ npm run dev
 
 No PowerShell com scripts bloqueados, use `npm.cmd` em vez de `npm`. O comando `dev` inicia a API, aguarda `/api/health` e inicia o Vite. A interface fica normalmente em http://localhost:5173 e a API em http://127.0.0.1:3333. Mantenha o terminal aberto.
 
-Serviços separados: `npm run dev:backend` e `npm run dev:frontend`. Verificações: `npm run lint`, `npm run test:backend` e `npm run build`. O build gera `dist/`, que deve permanecer fora do versionamento. `npm run preview` não substitui a configuração de produção.
+Serviços separados: `npm run dev:backend` e `npm run dev:frontend`. Verificações: `npm run lint`, `npm run test:backend` e `npm run build`. O build gera `frontend/dist/`, que deve permanecer fora do versionamento. `npm run preview` não substitui a configuração de produção.
 
 ## Ambiente
 
@@ -32,7 +32,7 @@ Copie `.env.example` para `.env` se precisar alterar os padrões. Nunca versione
 | `GUARDIOES_PYTHON` | Executável Python alternativo, opcional |
 | `VITE_API_URL` | Base da API no navegador; padrão `/api` |
 
-O proxy usa IPv4 explícito e acompanha `PORT`. Em produção, publique `dist/` com fallback para `index.html` e encaminhe `/api` à API por HTTPS.
+O proxy usa IPv4 explícito e acompanha `PORT`. Em produção, publique `frontend/dist/` com fallback para `index.html` e encaminhe `/api` à API por HTTPS.
 
 ## Administrador
 
@@ -40,11 +40,11 @@ Defina valores próprios no ambiente local para `GUARDIOES_DE_SAQUAREMA_ADMIN_CP
 
 O usuário aceita 3 a 40 letras minúsculas, números, ponto, hífen e sublinhado. A senha exige 12 a 256 caracteres. O email deve ser exclusivo.
 
-Execute `npm run admin:create` somente para provisionar o administrador inicial. Repetir o comando não duplica a conta nem altera sua senha. O reset de contas existentes é realizado pelo administrador no painel: retorna ao CPF cadastrado, revoga sessões e exige uma nova senha no primeiro acesso. O antigo reset por variável de ambiente foi desabilitado. Remova as credenciais do ambiente após o provisionamento inicial.
+Execute `npm run admin:create` para provisionar o administrador inicial. O comando exibe uma senha temporária aleatória, válida por 24 horas, com troca obrigatória no primeiro acesso. Repetir o comando preserva a conta existente. A redefinição ocorre no painel, com nova senha aleatória e revogação das sessões. Para recuperação do administrador pelo operador institucional autorizado no ambiente local, use `npm run admin:create -- --reset-password`.
 
-No painel `/admin/dashboard`, a listagem centraliza a administração de usuários. O formulário de cadastro fica em `/admin/usuarios/novo`, e a edição abre em uma janela sobre a lista, também acessível em `/admin/usuarios/:userId/editar`. A visualização de dados usa uma janela semelhante. O administrador pode cadastrar, consultar, editar, desativar e resetar o acesso de Aluno (`USER`), Gestor Escolar (`GESTOR_ESCOLAR`) e Administrador (`ADMIN`). CPF de 11 dígitos e nascimento em `DD/MM/AAAA` são obrigatórios nos novos cadastros. O formulário não permite definir senhas: a primeira senha é o CPF, com troca obrigatória em `/primeiro-acesso`, antes de acessar qualquer funcionalidade.
+No painel administrativo, cadastre, consulte, edite, desative e redefina o acesso de alunos, gestores e administradores. Alunos utilizam matrícula única e profissionais utilizam CPF no login. O sistema gera a senha temporária e a exibe na janela de entrega administrativa. Consulte [cadastro e autenticação](docs/CADASTRO_E_AUTENTICACAO.md).
 
-O cadastro de usuários é exclusivo do administrador. `/cadastro` redireciona ao login e `POST /api/auth/register` retorna 403. A validação de solicitações foi removida; novos cadastros administrativos usam CPF como senha inicial com troca obrigatória. Edição de dados cadastrais e reset são exclusivos da administração. A desativação e o reset revogam sessões sem apagar histórico. Contas antigas mantêm suas senhas; complete CPF e nascimento na edição antes de resetar. A Gestão Escolar implementada está descrita em [Gestão de Turmas e Alunos](docs/GESTAO_TURMAS_E_ALUNOS.md).
+O cadastro de usuários é exclusivo do administrador. O cadastro público está desativado. A troca da senha temporária em `/primeiro-acesso` é obrigatória antes de acessar os módulos. Redefinição e desativação revogam as sessões e preservam o histórico. A gestão escolar está descrita em [Gestão de Turmas e Alunos](docs/GESTAO_TURMAS_E_ALUNOS.md).
 
 ## Dados e compatibilidade
 
@@ -52,7 +52,7 @@ O banco ativo é PostgreSQL, definido por `DATABASE_URL`. O SQLite de origem per
 
 Os aliases `ECOMAR_ADMIN_*` continuam aceitos quando a variável correspondente `GUARDIOES_DE_SAQUAREMA_*` não está definida. A conexão ativa usa somente `DATABASE_URL`; `ECOMAR_DB_PATH` pertence ao backend legado. O antigo `ECOMAR_ADMIN_EMAILS` não concede privilégios.
 
-A chave persistente `ecomar:auth-token:v1` foi preservada para manter sessões existentes. O evento interno de expiração usa o novo nome e está centralizado em `src/config/auth.js`. Dados históricos que possam existir no localStorage não são apagados pela remoção dos módulos locais sem uso.
+A chave persistente `ecomar:auth-token:v1` foi preservada para manter sessões existentes. O evento interno de expiração usa o novo nome e está centralizado em `frontend/src/config/auth.js`. Dados históricos que possam existir no localStorage não são apagados pela remoção dos módulos locais sem uso.
 
 Novas senhas usam scrypt; hashes PBKDF2 existentes continuam válidos. Sessões expiram em oito horas e são revogadas no logout e na redefinição de senha. Sem rede, o logout limpa o token local, mas a revogação remota depende da API. O limite de 30 tentativas por IP em 15 minutos permanece local ao processo.
 
@@ -60,7 +60,7 @@ As contas administrativas existentes são preservadas. Revise contas criadas pel
 
 ## Organização e validação
 
-As rotas estão em `src/routes`, as páginas em `src/pages`, a tela reutilizável de login em `src/components/LoginScreen.jsx` e a API ativa em `backend/python/gds`. O código Node em `backend/src` é legado explícito para regressão e reversão controlada. Veja [operação, migração e testes do backend](backend/README.md).
+As rotas estão em `frontend/src/routes`, as páginas em `frontend/src/pages`, a tela reutilizável de login em `frontend/src/components/LoginScreen.jsx` e a API ativa em `backend/python/gds`. O código Node em `backend/src` é legado explícito para regressão e reversão controlada. Veja [operação, migração e testes do backend](backend/README.md).
 
 Consulte [o relatório técnico](docs/REVISAO_TECNICA.md) para a estrutura anterior e atual, arquivos removidos, decisões de compatibilidade, testes executados e pendências.
 
@@ -84,4 +84,12 @@ Na Gestão de Turmas e Alunos, o Administrador acessa qualquer unidade somente p
 
 XP e conquistas seguem a progressão de dez níveis do relatório atualizado, com nível máximo aos 1.200 XP. Consulte [as regras e a compatibilidade dos dados](docs/XP_NIVEIS_E_CONQUISTAS.md); execute as migrações ao atualizar.
 
-Cadastro e acesso por categoria: alunos usam matrícula no login e como senha temporária; gestores e administradores usam CPF no login e como senha temporária. Veja [cadastro, privacidade e migração de contas existentes](docs/CADASTRO_E_AUTENTICACAO.md).
+Alunos acessam por matrícula e profissionais por CPF, acompanhados da senha pessoal ou temporária aleatória. Consulte [cadastro, privacidade e migração de contas existentes](docs/CADASTRO_E_AUTENTICACAO.md).
+
+## Frontend
+
+A interface e suas configuracoes ficam em `frontend/`. O projeto usa npm workspaces e um unico `package-lock.json` na raiz. Execute `npm install` na raiz para instalar as dependencias.
+
+Os comandos da raiz continuam disponiveis: `npm run dev` inicia API e interface, `npm run dev:frontend` inicia apenas a interface e `npm run build` gera `frontend/dist/`. Dentro de `frontend`, tambem e possivel executar `npm run dev`, `npm run lint`, `npm run build` e `npm run preview`. O arquivo `.env` compartilhado permanece na raiz e e carregado pela configuracao do Vite.
+
+Regras de XP, limites diários dos minigames, disponibilidade e repetibilidade das missões estão descritas em [XP, níveis e conquistas](docs/XP_NIVEIS_E_CONQUISTAS.md). Após atualizar o código, execute `npm run db:migrate` e reinicie a API.

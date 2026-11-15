@@ -8,7 +8,7 @@ from pathlib import Path
 
 from psycopg import sql
 
-from . import games, access
+from . import games, access, daily_missions
 from .progression import progression
 from .errors import ApiError, unauthorized
 from .security import clean, email, hash_password, identifier, profile, token, valid_password, verify_password
@@ -16,7 +16,8 @@ from .time import day, now, previous_day, week
 from .validation import mission_validation, validate_mission, validate_text
 from . import user_management
 from .identity import cpf_digits
-from .onboarding import matches_initial
+from .content_icons import validate_icon
+from .onboarding import matches_initial, require_valid_temporary
 
 SEED = json.loads((Path(__file__).parent / "data" / "seed.json").read_text(encoding="utf-8"))
 
@@ -89,13 +90,9 @@ class Service:
             if cpf:
                 account = self.one("SELECT * FROM users WHERE role<>'USER' AND cpf=%s" + (" AND role='ADMIN'" if admin else "") + " FOR UPDATE", (cpf,))
         candidate = data.get("senha")
-        if account and account["must_change_password"]:
-            if account["role"] == "USER" and not account["registration_number"]:
-                account = None
-            elif matches_initial(candidate, account):
-                candidate = account["registration_number"] if account["role"] == "USER" else account["cpf"]
         if not account or not account["active"] or not verify_password(candidate, account["password_salt"], account["password_hash"]):
             raise ApiError("Identificacao ou senha invalidos.", 401)
+        require_valid_temporary(account)
         return {"usuario": self.user(account["id"]), "token": self.create_session(account["id"])}
 
     def create_session(self, user_id):
@@ -115,6 +112,7 @@ class Service:
             raise unauthorized() from None
         if not 0 <= age < 8 * 60 * 60:
             raise unauthorized()
+        require_valid_temporary(account)
         if account["must_change_password"] and not allow_password_setup:
             raise ApiError("Defina sua nova senha antes de acessar o sistema.", 403)
         return account["id"]
@@ -169,16 +167,19 @@ class Service:
         current = self.one("SELECT * FROM users WHERE id=%s", (user_id,))
         if not current["must_change_password"]:
             raise ApiError("Esta conta ja definiu sua senha inicial.")
+        require_valid_temporary(current)
         password = data.get("novaSenha")
         minimum = 12 if current["role"] == "ADMIN" else 8
         if not valid_password(password) or len(password) < minimum:
             raise ApiError(f"A nova senha precisa ter entre {minimum} e 256 caracteres.")
         if password != data.get("confirmarSenha"):
             raise ApiError("A confirmacao da senha nao confere.")
+        if verify_password(password, current["password_salt"], current["password_hash"]):
+            raise ApiError("Escolha uma senha diferente da senha temporaria.")
         if matches_initial(password, current):
             raise ApiError("Escolha uma senha diferente da matricula." if current["role"] == "USER" else "Escolha uma senha diferente do CPF.")
         salt, stamp = token(), now()
-        self.db.execute("UPDATE users SET password_salt=%s,password_hash=%s,must_change_password=FALSE,updated_at=%s WHERE id=%s",
+        self.db.execute("UPDATE users SET password_salt=%s,password_hash=%s,must_change_password=FALSE,temporary_password_expires_at=NULL,updated_at=%s WHERE id=%s",
                         (salt, hash_password(password, salt), stamp, user_id))
         self.db.execute("UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL", (stamp, user_id))
         return {"usuario": self.user(user_id), "token": self.create_session(user_id)}
@@ -192,26 +193,41 @@ class Service:
     @staticmethod
     def public_mission(row):
         return {**{key: row[key] for key in ["id", "titulo", "descricao", "aprendizado", "impacto", "categoria"]},
-                "dificuldade": {10: "Fácil", 20: "Média", 30: "Difícil"}[row["xp_recompensa"]], "xpRecompensa": row["xp_recompensa"], "validationType": row["validation_type"], "active": bool(row["active"])}
+                "dificuldade": {10: "Fácil", 20: "Média", 30: "Difícil"}[row["xp_recompensa"]], "xpRecompensa": row["xp_recompensa"], "validationType": row["validation_type"], "active": bool(row["active"]),
+                "icon": row["icon"], "repeatable": row["repeatable"], "available_from": row["available_from"].isoformat() if row["available_from"] else None,
+                "available_until": row["available_until"].isoformat() if row["available_until"] else None}
 
     def list_missions(self, user_id):
-        done = {row["mission_id"] for row in self.all("SELECT mission_id FROM mission_submissions WHERE user_id=%s AND date_key=%s", (user_id, day()))}
-        return {"missoes": [{**self.public_mission(row), "concluida": row["id"] in done,
-                              "validacao": mission_validation(row, True)} for row in self.rows("missions")]}
+        today = daily_missions.ensure_catalog(self)
+        done = {row["mission_id"]: row for row in self.all("SELECT mission_id,date_key,xp_awarded FROM mission_submissions WHERE user_id=%s ORDER BY date_key", (user_id,))}
+        rows = []
+        for mission in daily_missions.available(self, today):
+            completion = done.get(mission["id"])
+            completed_today = bool(completion and completion["date_key"] == today)
+            completed_once = bool(completion and not mission["repeatable"])
+            rows.append({**self.public_mission(mission), "concluida": completed_today or completed_once,
+                         "concluidaHoje": completed_today, "concluidaAnteriormente": completed_once and not completed_today,
+                         "xpRecebido": completion["xp_awarded"] if completed_today else 0,
+                         "validacao": mission_validation(mission, True)})
+        earned = self.one("SELECT COALESCE(SUM(xp_ganho),0) AS xp FROM activities WHERE user_id=%s AND tipo='missao' AND (created_at::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date=%s::date", (user_id,today))["xp"]
+        return {"missoes": rows, "catalogDate": today, "xpGanhoHoje": earned}
 
     def submit_mission(self, user_id, mission_id, data):
-        mission = self.one("SELECT * FROM missions WHERE id=%s AND active=1", (mission_id,))
+        today = daily_missions.ensure_catalog(self)
+        if data.get("catalogDate", today) != today:
+            raise ApiError("O catalogo de missoes foi renovado. Atualize as atividades do dia.", 409)
+        mission = next((row for row in daily_missions.available(self,today) if row["id"] == mission_id), None)
         if not mission:
-            raise ApiError("Missao nao encontrada.", 404)
-        if self.one("SELECT id FROM mission_submissions WHERE user_id=%s AND mission_id=%s AND date_key=%s", (user_id, mission_id, day())):
+            raise ApiError("Missao indisponivel no catalogo de hoje.", 404)
+        if self.one("SELECT id FROM mission_submissions WHERE user_id=%s AND mission_id=%s AND (date_key=%s OR NOT %s)", (user_id,mission_id,today,mission["repeatable"])):
             return self.no_reward(user_id)
         validated = validate_mission(mission, data)
-        self.db.execute("INSERT INTO mission_submissions (id,user_id,mission_id,date_key,payload_json,created_at) VALUES (%s,%s,%s,%s,%s,%s)",
-                        (identifier("msn"), user_id, mission_id, day(), json.dumps(validated, ensure_ascii=False), now()))
+        self.db.execute("INSERT INTO mission_submissions (id,user_id,mission_id,date_key,payload_json,created_at,xp_awarded) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (identifier("msn"),user_id,mission_id,today,json.dumps(validated,ensure_ascii=False),now(),mission["xp_recompensa"]))
         return self.reward(user_id, mission["xp_recompensa"], "missao", mission["titulo"], {"mission": 1})
 
     def lessons(self, module_id, inactive=False):
-        return [{**{key: row[key] for key in ["id", "titulo", "resumo", "habilidade", "atividade", "xp"]}, "active": bool(row["active"])}
+        return [{**{key: row[key] for key in ["id", "titulo", "resumo", "habilidade", "atividade", "xp", "icon"]}, "active": bool(row["active"])}
                 for row in self.all("SELECT * FROM lessons WHERE module_id=%s" + ("" if inactive else " AND active=1") + " ORDER BY sort_order,titulo", (module_id,))]
 
     def completed(self, user_id):
@@ -221,8 +237,8 @@ class Service:
         return result
 
     def public_module(self, row, completed=None, include_lessons=False, inactive=False):
-        done = completed or set()
         lessons = self.lessons(row["id"], inactive)
+        done = (completed or set()) & {lesson["id"] for lesson in lessons}
         result = {**{key: row[key] for key in ["id", "titulo", "descricao", "tema", "objetivo", "accent"]},
                   "acaoLocal": row["acao_local"], "perguntaGuia": row["pergunta_guia"], "active": bool(row["active"]),
                   "aulas": len(lessons), "concluidas": len(done), "percentual": math.floor(len(done) / len(lessons) * 100 + .5) if lessons else 0}
@@ -248,8 +264,8 @@ class Service:
         if lesson["concluida"]:
             return {**self.no_reward(user_id), "modulo": module}
         validated = validate_text(data.get("resposta"))
-        self.db.execute("INSERT INTO lesson_submissions (id,user_id,module_id,lesson_id,payload_json,created_at) VALUES (%s,%s,%s,%s,%s,%s)",
-                        (identifier("les"), user_id, module_id, lesson_id, json.dumps(validated, ensure_ascii=False), now()))
+        self.db.execute("INSERT INTO lesson_submissions (id,user_id,module_id,lesson_id,payload_json,created_at,xp_awarded) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (identifier("les"), user_id, module_id, lesson_id, json.dumps(validated, ensure_ascii=False), now(), lesson["xp"]))
         reward = self.reward(user_id, lesson["xp"], "aula", f"{module['titulo']}: {lesson['titulo']}", {"lesson": 1})
         return {**reward, **self.get_module(user_id, module_id)}
 
@@ -265,12 +281,10 @@ class Service:
         return {"stats": self.stats(user_id), **self.achievements(user_id)}
 
     def history(self, user_id):
+        days = week()
         rows = self.all("SELECT id,tipo,descricao,xp_ganho,created_at FROM activities WHERE user_id=%s ORDER BY created_at DESC LIMIT 80", (user_id,))
-        totals = {}
-        for row in rows:
-            key = day(datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")))
-            totals[key] = totals.get(key, 0) + row["xp_ganho"]
-        return {"grafico": [{"data": item["key"], "dia": item["label"], "xp": totals.get(item["key"], 0)} for item in week()],
+        totals = {row["date_key"]: row["xp"] for row in self.all("SELECT TO_CHAR(created_at::timestamptz AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') AS date_key,SUM(xp_ganho) AS xp FROM activities WHERE user_id=%s AND (created_at::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN %s::date AND %s::date GROUP BY 1", (user_id,days[0]["key"],days[-1]["key"]))}
+        return {"grafico": [{"data": item["key"], "dia": item["label"], "xp": totals.get(item["key"], 0)} for item in days],
                 "atividades": [{"id": row["id"], "tipo": row["tipo"], "descricao": row["descricao"], "xpGanho": row["xp_ganho"], "createdAt": row["created_at"]} for row in rows]}
 
     def no_reward(self, user_id):
@@ -278,8 +292,8 @@ class Service:
         return {"xpGanho": 0, "levelUp": False, "novoNivel": user["nivel"], "usuario": user, "novasConquistas": []}
 
     def grant(self, user_id, amount, kind, description, counters=None):
-        if amount <= 0:
-            return
+        if amount < 0:
+            raise ApiError("A recompensa de XP deve ser maior ou igual a zero.")
         counters = counters or {}
         stats = self.one("SELECT * FROM stats WHERE user_id=%s", (user_id,))
         today = day()
@@ -310,10 +324,17 @@ class Service:
 
     @staticmethod
     def public_game(row):
-        return {**{key: row[key] for key in ["id", "titulo", "descricao"]}, "xpRecompensa": row["xp_recompensa"], "enabled": bool(row["enabled"])}
+        return {**{key: row[key] for key in ["id", "titulo", "descricao"]}, "xpRecompensa": row["xp_recompensa"], "enabled": bool(row["enabled"]), "dailyRewardLimit": row["daily_reward_limit"]}
 
-    def list_games(self):
-        return {"jogos": [self.public_game(row) for row in self.rows("games_catalog")]}
+    def game_allowance(self, user_id, game_type):
+        today = day()
+        game = self.one("SELECT * FROM games_catalog WHERE id=%s FOR SHARE", (game_type,))
+        used = self.one("SELECT COUNT(*) AS n FROM game_sessions WHERE user_id=%s AND game_type=%s AND reward_date_key=%s AND reward_granted=1", (user_id,game_type,today))["n"]
+        return {"dailyRewardLimit": game["daily_reward_limit"], "rewardedToday": used,
+                "rewardsRemaining": max(0,game["daily_reward_limit"]-used), "rewardDate": today}
+
+    def list_games(self, user_id):
+        return {"jogos": [{**self.public_game(row), **self.game_allowance(user_id,row["id"])} for row in self.rows("games_catalog")]}
 
     def start_game(self, user_id, game_type):
         game = self.one("SELECT * FROM games_catalog WHERE id=%s AND enabled=1", (game_type,))
@@ -323,7 +344,7 @@ class Service:
         session_id, stamp = identifier("game"), now()
         self.db.execute("INSERT INTO game_sessions (id,user_id,game_type,state_json,completed_at,reward_granted,created_at,updated_at) VALUES (%s,%s,%s,%s,NULL,0,%s,%s)",
                         (session_id, user_id, game_type, json.dumps(state, ensure_ascii=False), stamp, stamp))
-        return {"sessionId": session_id, "jogo": games.public_memory(state) if game_type == "memory" else games.public_puzzle(state)}
+        return {"sessionId": session_id, "jogo": games.public_memory(state) if game_type == "memory" else games.public_puzzle(state), "recompensas": self.game_allowance(user_id,game_type)}
 
     def play_game(self, user_id, game_type, session_id, data):
         row = self.one("SELECT * FROM game_sessions WHERE id=%s AND user_id=%s AND game_type=%s FOR UPDATE", (session_id, user_id, game_type))
@@ -332,12 +353,18 @@ class Service:
         state = json.loads(row["state_json"])
         event = games.flip(state, data.get("cardId")) if game_type == "memory" else games.move(state, data.get("tile"))
         reward = self.no_reward(user_id)
-        if state["completed"] and not row["reward_granted"]:
-            reward = self.reward(user_id, state["xpReward"], "jogo", "Jogo da memoria concluido" if game_type == "memory" else "Quebra-cabeca concluido", {"game": 1})
-            row["reward_granted"], row["completed_at"] = 1, now()
-        self.db.execute("UPDATE game_sessions SET state_json=%s,completed_at=%s,reward_granted=%s,updated_at=%s WHERE id=%s",
-                        (json.dumps(state, ensure_ascii=False), row["completed_at"], row["reward_granted"], now(), session_id))
-        return {**reward, "sessionId": session_id, "jogo": games.public_memory(state) if game_type == "memory" else games.public_puzzle(state), "evento": event}
+        if state["completed"] and row["completed_at"] is None:
+            allowance = self.game_allowance(user_id, game_type)
+            amount = state["xpReward"] if allowance["rewardsRemaining"] > 0 else 0
+            reward = self.reward(user_id, amount, "jogo", "Jogo da memoria concluido" if game_type == "memory" else "Quebra-cabeca concluido", {"game": 1})
+            row["completed_at"] = now()
+            row["reward_granted"] = int(amount > 0)
+            row["reward_date_key"] = allowance["rewardDate"]
+            row["xp_awarded"] = amount
+        self.db.execute("UPDATE game_sessions SET state_json=%s,completed_at=%s,reward_granted=%s,reward_date_key=%s,xp_awarded=%s,updated_at=%s WHERE id=%s",
+                        (json.dumps(state,ensure_ascii=False),row["completed_at"],row["reward_granted"],row["reward_date_key"],row["xp_awarded"],now(),session_id))
+        return {**reward, "sessionId": session_id, "jogo": games.public_memory(state) if game_type == "memory" else games.public_puzzle(state),
+                "evento": event, "recompensas": self.game_allowance(user_id,game_type)}
 
     def admin_users(self, user_id):
         return user_management.list_users(self, user_id)
@@ -381,6 +408,8 @@ class Service:
                 raise ApiError("Campo obrigatorio.")
             return result
         record = {"id": item_id, "titulo": text("titulo", 100), "created_at": current.get("created_at", now()), "updated_at": now()}
+        if kind in ("mission", "lesson"):
+            record["icon"] = validate_icon(data.get("icon", current.get("icon")))
         if kind == "lesson":
             record.update({"module_id": module_id, "resumo": text("resumo", 500), "habilidade": text("habilidade", 160, "Aplicar conhecimento ambiental"),
                            "atividade": text("atividade", 300, "Responda a atividade com suas palavras."), "xp": content_number(value("xp", 50)), "active": int(bool(value("active", True)))})
@@ -389,7 +418,13 @@ class Service:
             if kind in ["mission", "game"]:
                 default_xp = (games.MEMORY_XP if item_id == "memory" else games.PUZZLE_XP) if kind == "game" else 10
                 record["xp_recompensa"] = content_number(value("xp_recompensa", default_xp, "xpRecompensa"))
+            if kind == "game":
+                limit = value("dailyRewardLimit", current.get("daily_reward_limit", 1), "daily_reward_limit")
+                if type(limit) is not int or not 0 <= limit <= 2147483647:
+                    raise ApiError("O limite diario deve ser um numero inteiro maior ou igual a zero.")
+                record["daily_reward_limit"] = limit
             if kind == "mission":
+                record.update(daily_missions.availability(data,current))
                 if float(value("xp_recompensa", 10, "xpRecompensa")) not in (10, 20, 30):
                     raise ApiError("Missoes devem conceder 10 XP (facil), 20 XP (media) ou 30 XP (dificil).")
                 validation_type = data.get("validationType") or data.get("validation_type")
@@ -404,6 +439,8 @@ class Service:
         query = sql.SQL("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM {}" + (" WHERE module_id=%s" if kind == "lesson" else "")).format(sql.Identifier(table))
         record["sort_order"] = current.get("sort_order") or self.one(query, (module_id,) if kind == "lesson" else ())["n"]
         self.upsert(table, record, ("module_id", "id") if kind == "lesson" else ("id",))
+        if kind == "mission":
+            daily_missions.ensure_catalog(self, refresh=True)
         if kind == "lesson":
             return {"modulo": self.public_module(self.one("SELECT * FROM modules WHERE id=%s", (module_id,)), include_lessons=True, inactive=True)}
         row = self.one(sql.SQL("SELECT * FROM {} WHERE id=%s").format(sql.Identifier(table)), (item_id,))

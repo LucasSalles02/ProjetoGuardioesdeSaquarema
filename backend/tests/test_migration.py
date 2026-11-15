@@ -18,6 +18,7 @@ from gds.service import Service
 from gds.database import connection, migrate
 from gds.import_sqlite import TABLES, import_sqlite
 from gds.security import verify_password
+from gds.time import day
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -96,6 +97,22 @@ def test_import_preserves_data_sessions_and_node_contract(db_url, legacy_source,
                     old_xp = mission["xpRecompensa"]
                     xp = old_xp if old_xp in (10,20,30) else 10 if old_xp <= 40 else 20 if old_xp <= 60 else 30
                     mission.update(xpRecompensa=xp, dificuldade={10:"F\u00e1cil",20:"M\u00e9dia",30:"Dif\u00edcil"}[xp])
+            if path in ("/api/missions", "/api/admin/content"):
+                for mission in expected["missoes"]:
+                    mission.update(icon=None,repeatable=True, available_from=None, available_until=None)
+                    if path == "/api/missions":
+                        mission.update(concluidaHoje=mission["concluida"], concluidaAnteriormente=False, xpRecebido=None if mission["concluida"] else 0)
+            if path == "/api/missions":
+                expected.update(catalogDate=day(), xpGanhoHoje=sum(item["xpGanho"] for item in contract["/api/progress/history"]["atividades"] if item["tipo"] == "missao"))
+            if path in ("/api/games", "/api/admin/content"):
+                for game in expected["jogos"]:
+                    game["dailyRewardLimit"] = 1
+                    if path == "/api/games":
+                        game.update(rewardedToday=0,rewardsRemaining=1,rewardDate=day())
+            modules = expected.get("modulos", []) + ([expected["modulo"]] if "modulo" in expected else [])
+            for module in modules:
+                for lesson in module.get("lessons", []):
+                    lesson["icon"] = None
             response = client.get(path, headers=headers)
             assert response.status_code == 200, path
             assert response.json() == expected, path
@@ -138,21 +155,26 @@ def test_admin_idempotent_reset_and_legacy_env(db_url, monkeypatch, prefix):
         monkeypatch.delenv(f"ECOMAR_{key}", raising=False)
         monkeypatch.setenv(f"{prefix}_{key}", value)
     with connection(db_url) as db:
-        provision_admin(db)
-        provision_admin(db)
+        credential = provision_admin(db)
+        assert provision_admin(db) is None
         assert db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 1
     with TestClient(create_app(db_url)) as client:
-        response = client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": password})
+        response = client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": credential["password"]})
         assert response.status_code == 200
         bearer = response.json()["token"]
         replacement = secrets.token_hex(24)
         monkeypatch.setenv(f"{prefix}_ADMIN_PASSWORD", replacement)
         with connection(db_url) as db:
-            with pytest.raises(Exception, match="painel administrativo"):
-                provision_admin(db, reset=True)
+            assert provision_admin(db) is None
         assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {bearer}"}).status_code == 200
-        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": password}).status_code == 200
+        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": password}).status_code == 401
+        with connection(db_url) as db:
+            reset = provision_admin(db, reset=True)
+        assert reset["password"] != credential["password"]
+        assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {bearer}"}).status_code == 401
+        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": credential["password"]}).status_code == 401
         assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": replacement}).status_code == 401
+        assert client.post("/api/auth/admin/login", json={"cpf": "88123456789", "senha": reset["password"]}).status_code == 200
     result = subprocess.run(["node", "backend/createAdmin.js"], cwd=ROOT,
                             env={**os.environ, "DATABASE_URL": db_url, "GUARDIOES_PYTHON": sys.executable}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -171,7 +193,7 @@ def test_pbkdf2_compatibility(client, account, db_url, password):
 def test_migrations_idempotent_and_checksum_guard(db_url):
     migrate(db_url)
     with connection(db_url) as db:
-        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 15
+        assert db.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"] == 19
         db.execute("UPDATE schema_migrations SET checksum='invalid'")
     with pytest.raises(RuntimeError, match="foi alterada"):
         migrate(db_url)

@@ -1,6 +1,9 @@
-"""Role-specific temporary credentials, including safe upgrades of existing users."""
+"""Individual temporary credentials and compatibility with existing accounts."""
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from .errors import ApiError
-from .identity import cpf_digits, matches_cpf
+from .identity import matches_cpf
 from .security import hash_password, token
 from .time import now
 
@@ -11,10 +14,8 @@ def registration(value):
     return value.strip()
 
 
-def initial_secret(account):
-    if account["role"] == "USER":
-        return registration(account.get("registration_number"))
-    return cpf_digits(account.get("cpf"))
+def initial_secret():
+    return secrets.token_urlsafe(18)
 
 
 def matches_initial(value, account):
@@ -23,15 +24,29 @@ def matches_initial(value, account):
     return matches_cpf(value, account.get("cpf"))
 
 
+def require_valid_temporary(account):
+    if not account["must_change_password"]:
+        return
+    expiry = account.get("temporary_password_expires_at")
+    if isinstance(expiry, str):
+        expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+    if expiry is None or expiry <= datetime.now(timezone.utc):
+        raise ApiError("Senha temporaria expirada. Solicite uma nova emissao ao administrador.", 401)
+
+
+def issue_temporary(service, user_id):
+    secret, salt = initial_secret(), token()
+    expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+    service.db.execute("UPDATE users SET password_salt=%s,password_hash=%s,must_change_password=TRUE,initial_credential_version=2,temporary_password_expires_at=%s,updated_at=%s WHERE id=%s",
+                       (salt, hash_password(secret, salt), expiry, now(), user_id))
+    service.db.execute("UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL", (now(), user_id))
+    return {"password": secret, "expires_at": expiry.isoformat()}
+
+
 def upgrade_credentials(db):
-    # Preserve personal passwords, XP and history. Only pending student credentials
-    # with a known enrollment number change from the former CPF default.
-    for account in db.execute("SELECT id,role,registration_number,must_change_password FROM users WHERE initial_credential_version=0 FOR UPDATE").fetchall():
-        if account["role"] == "USER" and account["must_change_password"]:
-            if not account["registration_number"]:
-                continue  # Requires administrator correction; never invent an identity.
-            salt = token()
-            db.execute("UPDATE users SET password_salt=%s,password_hash=%s,updated_at=%s WHERE id=%s",
-                       (salt, hash_password(account["registration_number"], salt), now(), account["id"]))
+    # Imported pending credentials also require reissue. Personal passwords survive.
+    for account in db.execute("SELECT id,must_change_password FROM users WHERE initial_credential_version<2 FOR UPDATE").fetchall():
+        if account["must_change_password"]:
+            db.execute("UPDATE users SET temporary_password_expires_at=CURRENT_TIMESTAMP WHERE id=%s", (account["id"],))
             db.execute("UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL", (now(), account["id"]))
-        db.execute("UPDATE users SET initial_credential_version=1 WHERE id=%s", (account["id"],))
+        db.execute("UPDATE users SET initial_credential_version=2 WHERE id=%s", (account["id"],))

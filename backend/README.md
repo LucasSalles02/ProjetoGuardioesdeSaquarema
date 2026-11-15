@@ -77,15 +77,15 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
-As variáveis `GUARDIOES_DE_SAQUAREMA_ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL` e `ADMIN_NAME` são lidas com o mesmo prefixo; os aliases `ECOMAR_ADMIN_*` continuam válidos. O provisionamento do administrador inicial é idempotente, exige senha de 12–256 caracteres e não promove uma conta comum por email. O reset por CLI foi desabilitado: contas existentes são resetadas exclusivamente pelo fluxo autenticado de administrador, retornando ao CPF cadastrado. PBKDF2 legado e scrypt continuam verificáveis, sem solicitar senhas aos usuários durante a importação.
+O provisionamento lê `GUARDIOES_DE_SAQUAREMA_ADMIN_CPF`, `GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL` e `GUARDIOES_DE_SAQUAREMA_ADMIN_NAME`. O primeiro administrador recebe uma senha temporária aleatória, válida por 24 horas e exibida ao operador após a transação. Repetir o comando preserva a conta. Para recuperação por operador institucional autorizado com acesso ao ambiente local, `npm run admin:create -- --reset-password` emite nova credencial do administrador identificado pelo CPF configurado e revoga suas sessões. `ADMIN_PASSWORD` deixou de definir a senha inicial.
 
 Rotas ativas do frontend: `/login`, `/admin/login`, `/admin/dashboard` e `/gestao`. `/cadastro` redireciona para o login. O health check `/api/health` inclui `runtime: python` e `database: postgresql`, com consulta real ao banco.
 
 ## Gerenciamento administrativo de usuários
 
-Em `/admin/dashboard`, o administrador pode listar/buscar usuários, filtrar por perfil/situação, consultar detalhes, editar dados, confirmar desativação e resetar o acesso. O cadastro possui tela própria em `/admin/usuarios/novo`; a edição abre em uma janela sobre o painel em `/admin/usuarios/{id}/editar`. A visualização de dados também abre em uma janela compacta. Os formulários exigem nome, usuário único, email único, perfil, CPF único de 11 dígitos e data de nascimento válida em `DD/MM/AAAA`. O CPF é armazenado sem pontuação e com zeros à esquerda preservados; a data é um `DATE` no PostgreSQL, serializado em formato brasileiro nas APIs administrativas. A validação de CPF cobre o formato solicitado de 11 dígitos, sem consulta externa.
+O administrador cadastra alunos por nome completo e matrícula única e profissionais por nome completo, CPF único e e-mail profissional. Data de nascimento é opcional. Não há campo de nome de usuário no formulário. Vínculos de escola e turma seguem os controles institucionais. Consulte [cadastro por categoria](../docs/CADASTRO_E_AUTENTICACAO.md).
 
-Não se define senha no cadastro nem na edição administrativa; tentativas de enviar campos de senha são recusadas. A senha inicial é o CPF, armazenado com hash scrypt, e `must_change_password` restringe o acesso até o titular criar sua nova senha. A nova senha exige 8–256 caracteres (12 no mínimo para ADMIN), confirmação e valor diferente do CPF. A conclusão invalida os tokens iniciais e emite uma nova sessão. CPF pode identificar a conta nos dois logins; email e usuário anteriores continuam aceitos nos respectivos fluxos. O cadastro não substitui a sessão do administrador.
+O sistema gera uma senha temporária individual e aleatória, armazenada com hash scrypt e validade de 24 horas a partir da emissão. A credencial é devolvida somente na resposta administrativa de criação, redefinição ou mudança de identidade/categoria que exija novo primeiro acesso. As consultas não revelam a senha. Alunos entram por matrícula e profissionais por CPF. A troca obrigatória impede acesso aos módulos até a definição de senha pessoal e invalida a temporária. Credenciais expiradas exigem nova emissão. Login por e-mail ou nome de usuário está desativado.
 
 Endpoints protegidos exclusivamente para administradores ativos:
 
@@ -95,18 +95,18 @@ Endpoints protegidos exclusivamente para administradores ativos:
 | `GET /api/admin/users/{id}` | Consultar detalhes sem dados de senha |
 | `POST /api/admin/users` | Cadastrar usuário com um dos três perfis |
 | `PATCH /api/admin/users/{id}` | Editar dados cadastrais, sem definir senha |
-| `POST /api/admin/users/{id}/reset-password` | Retornar a senha inicial ao CPF e exigir troca |
+| `POST /api/admin/users/{id}/reset-password` | Emitir senha aleatória por 24 horas, revogar sessões e exigir troca |
 | `PATCH /api/admin/users/{id}/deactivate` | Desativar conta e revogar todas as sessões |
 
 Desativar preserva usuário, histórico, conquistas e progresso. A conta não pode entrar por nenhum dos logins nem usar tokens anteriores. O servidor verifica também a situação ativa a cada operação. Não é permitido desativar a própria conta administrativa; operações concorrentes de administradores são serializadas para manter ao menos um administrador ativo. O comando de provisionamento/reset não reativa contas desativadas. A confirmação da interface não substitui essas verificações no backend.
 
-Edição e reset exigem administrador ativo com senha já definida. A própria conta administrativa não pode ser rebaixada por seu titular. Alteração de CPF/email/usuário/perfil revoga sessões; mudar CPF durante o primeiro acesso pendente também atualiza a senha inicial para o novo CPF. Depois de uma senha pessoal definida, editar CPF não altera essa senha. Reset não reativa contas desativadas. Contas antigas sem CPF/nascimento não são modificadas automaticamente: complete os dados antes de resetar. Edição de cadastro pelo antigo `/account/profile` é recusada, inclusive para administradores: use as rotas de administração. A alteração voluntária da própria senha, com senha atual, permanece separada do reset administrativo.
+Edição e reset exigem administrador ativo com senha pessoal definida e permissões efetivas compatíveis. Alterar identificador ou perfil revoga sessões. Contas pendentes recebem nova senha aleatória quando seus identificadores mudam. Senhas pessoais são preservadas nas edições comuns. Alterar categoria exige novo primeiro acesso. Complete identificadores ausentes antes da emissão. O reset preserva situação da conta, vínculos e progresso.
 
 As migrações `003_cpf_first_access.sql` e `004_registration_requests.sql` adicionam CPF, nascimento, troca obrigatória e fila de solicitações, preservando dados e senhas existentes. Reativação de contas e exclusão definitiva de usuários continuam fora desta etapa. As entregas posteriores de vínculos, unidades, turmas e etapas estão descritas em [Gestão de Turmas e Alunos](../docs/GESTAO_TURMAS_E_ALUNOS.md).
 
 ## Cadastro exclusivo pela administração
 
-`POST /api/auth/register` retorna **403**. O cadastro é realizado exclusivamente por administradores autenticados em `POST /api/admin/users`, com CPF como senha inicial e troca obrigatória. A interface `/cadastro` redireciona para `/login`.
+`POST /api/auth/register` retorna **403**. O cadastro pertence aos administradores autenticados em `POST /api/admin/users`, com senha temporária aleatória e troca obrigatória. A interface `/cadastro` redireciona para `/login`.
 
 A fila de solicitações e seus endpoints de listagem, aprovação e recusa foram removidos do fluxo ativo (retornam 404). A tabela histórica e a migração já aplicada permanecem para preservar dados e backups.
 

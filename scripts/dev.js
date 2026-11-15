@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 ﻿import { spawn } from "node:child_process";
 import { pythonEnvironment, pythonRuntime } from "./python-runtime.js";
 import { hasLocalPostgres, startLocalPostgres } from "./postgres-local.js";
@@ -33,7 +34,7 @@ while (Date.now() < deadline && !stopping) {
 }
 if (!ready) { console.error("API Python/PostgreSQL nao iniciou. Verifique DATABASE_URL e a porta configurada."); stop(1); }
 else if (!stopping) {
-  const vite = spawn(process.execPath, ["node_modules/vite/bin/vite.js"], { stdio: "inherit" });
+  const vite = spawn(process.execPath, [resolve("node_modules/vite/bin/vite.js")], { cwd: resolve("frontend"), stdio: "inherit", windowsHide: true });
   children.push(vite);
   vite.on("exit", code => stop(code || 0));
   vite.on("error", () => stop(1));

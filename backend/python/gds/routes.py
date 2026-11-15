@@ -1,10 +1,19 @@
 import re
 
 from .errors import ApiError
-from . import access, schools, school_management, highlights
+from . import access, schools, school_management, highlights, transfers
 
 # HTTP contracts deliberately retain the URLs and Portuguese envelopes used by React.
 ROUTES = [
+    ("GET", r"school-management/transfers/options", lambda s,u,b,p: transfers.options(s,u)),
+    ("GET", r"school-management/transfers", lambda s,u,b,p: transfers.listing(s,u)),
+    ("POST", r"school-management/transfers", lambda s,u,b,p: transfers.create(s,u,b)),
+    ("GET", r"school-management/transfers/([^/]+)", lambda s,u,b,p: transfers.detail(s,u,p[0])),
+    ("GET", r"admin/transfers", lambda s,u,b,p: transfers.listing(s,u)),
+    ("GET", r"admin/transfers/([^/]+)", lambda s,u,b,p: transfers.detail(s,u,p[0])),
+    ("POST", r"admin/transfers/([^/]+)/approve", lambda s,u,b,p: transfers.review(s,u,p[0],b,True)),
+    ("POST", r"admin/transfers/([^/]+)/reject", lambda s,u,b,p: transfers.review(s,u,p[0],b,False)),
+    ("POST", r"admin/transfers/([^/]+)/execute", lambda s,u,b,p: transfers.execute(s,u,p[0],b)),
     ("GET", r"school-management/students/([^/]+)/record", lambda s, u, b, p: school_management.student_record(s, u, p[0])),
     ("POST", r"school-management/classes/([^/]+)/students", lambda s, u, b, p: school_management.allocate_students(s, u, p[0], b)),
     ("GET", r"highlights", lambda s, u, b, p: highlights.listing(s, u)),
@@ -62,7 +71,7 @@ ROUTES = [
     ("GET", r"progress", lambda s, u, b, p: s.progress(u)),
     ("GET", r"progress/history", lambda s, u, b, p: s.history(u)),
     ("GET", r"achievements", lambda s, u, b, p: s.achievements(u)),
-    ("GET", r"games", lambda s, u, b, p: s.list_games()),
+    ("GET", r"games", lambda s, u, b, p: s.list_games(u)),
     ("POST", r"games/memory/sessions", lambda s, u, b, p: s.start_game(u, "memory")),
     ("POST", r"games/puzzle/sessions", lambda s, u, b, p: s.start_game(u, "puzzle")),
     ("POST", r"games/memory/sessions/([^/]+)/flip", lambda s, u, b, p: s.play_game(u, "memory", p[0], b)),
@@ -102,6 +111,10 @@ def dispatch(service, method, path, body, bearer, requested_school=""):
             if permission:
                 access.require(service, user_id, permission)
             actor = service.one("SELECT role FROM users WHERE id=%s", (user_id,))
+            if path.startswith("admin/transfers"):
+                service.require_admin(user_id)
+            if path.startswith("school-management/transfers") and actor["role"] != "GESTOR_ESCOLAR":
+                raise ApiError("Somente o gestor da origem pode acessar este fluxo de solicitacoes.", 403)
             if (actor["role"] == "GESTOR_ESCOLAR" and path not in ["auth/me", "auth/first-access/password", "account/profile", "account/password", "school-units"]) or (actor["role"] == "ADMIN" and path.startswith("school-management/")):
                 unit = schools.require_context(service, user_id, bearer, requested_school)
                 service.school_id = unit["id"]

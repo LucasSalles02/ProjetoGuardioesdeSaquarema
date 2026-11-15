@@ -9,25 +9,25 @@ from gds.service import Service
 def create_student(client, headers, number="00001234", **changes):
     result = client.post("/api/admin/users", headers=headers, json={"nome": "Nome Completo Ficticio", "role": "USER", "registration_number": number, **changes})
     assert result.status_code == 200, result.text
-    return result.json()["usuario"]
+    return {**result.json()["usuario"], "temporary_password": result.json()["temporary_credential"]["password"]}
 
 
 def test_no_username_required_and_enrollment_is_the_student_login(client, admin_headers):
     account = create_student(client, admin_headers)
     assert account["username"] is None
-    result = client.post("/api/auth/login", json={"registration_number": "00001234", "senha": "00001234"})
+    result = client.post("/api/auth/login", json={"registration_number": "00001234", "senha": account["temporary_password"]})
     assert result.status_code == 200
     assert result.json()["usuario"]["nome"] == "Nome Completo Ficticio"
     assert result.json()["usuario"]["must_change_password"]
     assert client.post("/api/auth/login", json={"registration_number": "1234", "senha": "00001234"}).status_code == 401
-    assert client.post("/api/auth/admin/login", json={"registration_number": "00001234", "senha": "00001234"}).status_code == 401
+    assert client.post("/api/auth/admin/login", json={"registration_number": "00001234", "senha": account["temporary_password"]}).status_code == 401
 
 
 def test_legacy_username_email_and_full_name_are_not_login_identifiers(client, admin_headers):
     account = create_student(client, admin_headers, username="legado.aluno", email="legado@example.com")
     for field, value in [("username", "legado.aluno"), ("email", "legado@example.com"), ("registration_number", "legado.aluno"), ("registration_number", account["nome"])]:
         assert client.post("/api/auth/login", json={field: value, "senha": "00001234"}).status_code == 401
-    assert client.post("/api/auth/login", json={"registration_number": "00001234", "senha": "00001234"}).status_code == 200
+    assert client.post("/api/auth/login", json={"registration_number": "00001234", "senha": account["temporary_password"]}).status_code == 200
 
 
 def test_same_full_names_allowed_but_enrollment_unique_across_schools_and_inactive_accounts(client, admin_headers):
@@ -47,8 +47,8 @@ def test_staff_cpf_does_not_conflict_with_student_enrollment(client, admin_heade
     staff = client.post("/api/admin/users", headers=admin_headers, json=data)
     assert staff.status_code == 200, staff.text
     assert staff.json()["usuario"]["username"] is None
-    student_login = client.post("/api/auth/login", json={"registration_number": number, "senha": number})
-    staff_login = client.post("/api/auth/login", json={"cpf": number, "senha": number})
+    student_login = client.post("/api/auth/login", json={"registration_number": number, "senha": child["temporary_password"]})
+    staff_login = client.post("/api/auth/login", json={"cpf": number, "senha": staff.json()["temporary_credential"]["password"]})
     assert student_login.json()["usuario"]["id"] == child["id"]
     assert staff_login.json()["usuario"]["id"] == staff.json()["usuario"]["id"]
     assert client.post("/api/auth/admin/login", json={"cpf": number, "senha": number}).status_code == 401

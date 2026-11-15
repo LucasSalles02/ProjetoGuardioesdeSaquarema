@@ -13,9 +13,18 @@ def new_account(role="USER", suffix="one"):
             "registration_number": "000" + suffix, "cpf": f"{secrets.randbelow(10**11):011d}", "birth_date": "29/02/2000", "role": role}
 
 
+def create_account(client, headers, payload):
+    response = client.post("/api/admin/users", headers=headers, json=payload)
+    assert response.status_code == 200, response.text
+    if not hasattr(client, "issued_credentials"):
+        client.issued_credentials = {}
+    client.issued_credentials[payload["cpf"]] = response.json()["temporary_credential"]["password"]
+    return response
+
+
 def login(client, payload, password=None):
     path = "/api/auth/admin/login" if payload["role"] == "ADMIN" else "/api/auth/login"
-    return client.post(path, json={("registration_number" if payload["role"] == "USER" else "cpf"): payload["registration_number"] if payload["role"] == "USER" else payload["cpf"], "senha": password or (payload["registration_number"] if payload["role"] == "USER" else payload["cpf"])})
+    return client.post(path, json={("registration_number" if payload["role"] == "USER" else "cpf"): payload["registration_number"] if payload["role"] == "USER" else payload["cpf"], "senha": password or client.issued_credentials[payload["cpf"]]})
 
 
 def enter(client, payload):
@@ -29,10 +38,10 @@ def enter(client, payload):
 
 
 @pytest.mark.parametrize("role", ["USER", "GESTOR_ESCOLAR", "ADMIN"])
-def test_cpf_first_access_restricts_all_profiles_until_password_set(client, admin_headers, role, db_url):
+def test_temporary_first_access_restricts_all_profiles_until_password_set(client, admin_headers, role, db_url):
     before = client.get("/api/auth/me", headers=admin_headers).json()["usuario"]["id"]
     payload = new_account(role)
-    response = client.post("/api/admin/users", headers=admin_headers, json=payload)
+    response = create_account(client, admin_headers, payload)
     assert response.status_code == 200, response.text
     created = response.json()["usuario"]
     assert "token" not in response.json()
@@ -89,9 +98,9 @@ def test_duplicates_and_validation(client, admin_headers):
 
 
 @pytest.mark.parametrize("role", ["USER", "GESTOR_ESCOLAR", "ADMIN"])
-def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, admin_headers, db_url, role):
+def test_admin_reset_issues_random_secret_revokes_sessions_and_preserves_data(client, admin_headers, db_url, role):
     payload = new_account(role)
-    target = client.post("/api/admin/users", headers=admin_headers, json=payload).json()["usuario"]
+    target = create_account(client, admin_headers, payload).json()["usuario"]
     headers, password = enter(client, payload)
     extra = login(client, payload, password).json()["token"]
     evidence = {"residuo1": "garrafa", "residuo2": "sacola", "residuo3": "canudo"}
@@ -111,7 +120,7 @@ def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, ad
     for value in [headers, {"Authorization": f"Bearer {extra}"}]:
         assert client.get("/api/auth/me", headers=value).status_code == 401
     assert login(client, payload, password).status_code == 401
-    initial = login(client, payload)
+    initial = login(client, payload, response.json()["temporary_credential"]["password"])
     assert initial.status_code == 200
     assert client.get("/api/progress", headers={"Authorization": f"Bearer {initial.json()['token']}"}).status_code == 403
     with connection(db_url) as db:
@@ -121,7 +130,7 @@ def test_admin_reset_restores_cpf_revokes_sessions_and_preserves_data(client, ad
 
 def test_edit_cpf_pending_and_completed_accounts_and_protect_password(client, admin_headers):
     payload = new_account("GESTOR_ESCOLAR")
-    target = client.post("/api/admin/users", headers=admin_headers, json=payload).json()["usuario"]
+    target = create_account(client, admin_headers, payload).json()["usuario"]
     path = f"/api/admin/users/{target['id']}"
     old_headers = {"Authorization": f"Bearer {login(client, payload).json()['token']}"}
     updated = {**payload, "nome": "Nome Editado", "cpf": "00123456789", "birth_date": "15/04/2010", "escola": "Escola Atualizada", "turma": "Turma Atualizada"}
@@ -130,8 +139,11 @@ def test_edit_cpf_pending_and_completed_accounts_and_protect_password(client, ad
     assert response.json()["usuario"]["escola"] == "Escola Atualizada"
     assert client.get("/api/auth/me", headers=old_headers).status_code == 401
     assert login(client, payload).status_code == 401
+    client.issued_credentials[updated["cpf"]] = response.json()["temporary_credential"]["password"]
     headers, password = enter(client, updated)
+    issued_password = client.issued_credentials[updated["cpf"]]
     updated["cpf"] = "00987654321"
+    client.issued_credentials[updated["cpf"]] = issued_password
     assert client.patch(path, headers=admin_headers, json=updated).status_code == 200
     assert client.get("/api/auth/me", headers=headers).status_code == 401
     assert login(client, updated, password).status_code == 200
@@ -142,7 +154,7 @@ def test_edit_cpf_pending_and_completed_accounts_and_protect_password(client, ad
 
 def test_deactivation_blocks_first_access_and_does_not_delete_history(client, admin_headers, db_url):
     payload = new_account()
-    target = client.post("/api/admin/users", headers=admin_headers, json=payload).json()["usuario"]
+    target = create_account(client, admin_headers, payload).json()["usuario"]
     first_token = login(client, payload).json()["token"]
     path = f"/api/admin/users/{target['id']}/deactivate"
     result = client.patch(path, headers=admin_headers).json()["usuario"]
@@ -170,7 +182,7 @@ def test_self_admin_role_and_deactivation_protected_and_own_reset_works(client, 
 
 def test_concurrent_admin_deactivation_keeps_one_active(client, admin_headers, account, db_url):
     payload = new_account("ADMIN", "second")
-    second = client.post("/api/admin/users", headers=admin_headers, json=payload).json()["usuario"]
+    second = create_account(client, admin_headers, payload).json()["usuario"]
     second_headers, _ = enter(client, payload)
     barrier = Barrier(2)
     def deactivate(pair):
