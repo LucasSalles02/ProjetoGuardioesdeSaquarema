@@ -5,6 +5,7 @@ import PageShell from "../components/PageShell";
 import { LearningDetail, LearningHero, LearningProgress, learningTheme } from "../components/LearningElements";
 import { aprendizado } from "../services/api";
 import { can } from "../services/permissions";
+import { useReward } from "../context/RewardContext";
 import { useAuth } from "../context/AuthContext";
 import { contentIcon } from "../services/contentIcons";
 import useContentAnchor from "../hooks/useContentAnchor";
@@ -12,6 +13,7 @@ import useContentAnchor from "../hooks/useContentAnchor";
 export default function ModuloAprender() {
   const { moduloId } = useParams();
   const { user, atualizarUsuario } = useAuth();
+  const { celebrate } = useReward();
   const [modulo, setModulo] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [error, setError] = useState("");
@@ -41,6 +43,7 @@ export default function ModuloAprender() {
     setConcluindo(lessonId); setFeedback("");
     try {
       const result = await aprendizado.concluirAula(submittedModule,lessonId,{ resposta: respostas[lessonId] || "" });
+      celebrate(result, result.modulo?.percentual === 100 && modulo.percentual < 100 ? "Trilha concluída!" : "Aula concluída!");
       atualizarUsuario(result.usuario);
       if (currentModule.current !== submittedModule) return;
       setModulo(result.modulo);

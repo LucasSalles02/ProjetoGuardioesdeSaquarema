@@ -1,0 +1,356 @@
+.game-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 28px;
+  background: linear-gradient(135deg, #e0f2fe, #ccfbf1);
+}
+.game-preview--puzzle {
+  background: linear-gradient(135deg, #dbeafe, #e0f2fe 50%, #fef3c7);
+}
+.preview-sea-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 65px;
+  height: 58px;
+  border: 3px solid white;
+  border-radius: 17px;
+  background: #fff;
+  font-size: 35px;
+  box-shadow: 0 6px 0 #0e749012;
+}
+.ocean-game-card {
+  box-shadow: 0 8px 25px #07598509;
+}
+.ocean-game-stage {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  color: #082f49;
+  background:
+    radial-gradient(ellipse at 15% 12%, #ffffff 0, transparent 45%),
+    linear-gradient(160deg, #e0f2fe, #ecfeff 48%, #a7f3d0);
+  overflow: hidden;
+}
+.ocean-game-stage[open] {
+  display: flex;
+  flex-direction: column;
+}
+.ocean-game-stage::backdrop {
+  background: #e0f2fe;
+}
+.game-stage-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #a5f3fc;
+  border-radius: 14px;
+  background: white;
+  color: #075985;
+  font-size: 13px;
+  font-weight: 800;
+}
+.game-stage-button:disabled {
+  opacity: 0.5;
+}
+.game-stage-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom));
+}
+.game-stage-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  width: min(100%, 740px);
+  margin-inline: auto;
+  font-size: 14px;
+  font-weight: 800;
+}
+.ocean-memory-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(8px, 2vw, 16px);
+  width: min(100%, 740px, calc((100dvh - 260px) * 1.8));
+  margin-inline: auto;
+}
+.ocean-memory-card {
+  position: relative;
+  aspect-ratio: 1.25;
+  min-width: 0;
+  border: 0;
+  border-radius: clamp(12px, 2vw, 24px);
+  background: transparent;
+  perspective: 700px;
+}
+.ocean-card-front,
+.ocean-card-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  backface-visibility: hidden;
+  transition: transform 0.42s;
+  border: 3px solid white;
+  box-shadow: 0 6px 0 #07598520;
+}
+.ocean-card-front {
+  overflow: hidden;
+  color: white;
+  background: linear-gradient(145deg, #38bdf8, #0369a1);
+}
+.ocean-card-front > svg {
+  width: 40%;
+  height: 40%;
+  opacity: 0.85;
+}
+.card-bubble {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff60;
+  border-radius: 50%;
+}
+.ocean-card-back {
+  transform: rotateY(180deg);
+  background: var(--sea-card-color);
+}
+.is-revealed .ocean-card-front {
+  transform: rotateY(-180deg);
+}
+.is-revealed .ocean-card-back {
+  transform: rotateY(0);
+}
+.is-matched .ocean-card-back {
+  border-color: #34d399;
+  box-shadow: 0 5px 0 #05966922;
+}
+.marine-drawing {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: clamp(30px, 6vw, 70px);
+  line-height: 1;
+  filter: drop-shadow(0 3px 1px #07598512);
+}
+.ocean-puzzle-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(8px, 2vw, 14px);
+  width: min(100%, 470px, calc(100dvh - 270px));
+  margin-inline: auto;
+}
+.ocean-puzzle-tile {
+  display: flex;
+  position: relative;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 3px solid white;
+  border-radius: 20px;
+  background: var(--tile-color);
+  box-shadow: 0 5px 0 #07598522;
+  transition: transform 0.18s;
+}
+.ocean-puzzle-tile:not(:disabled):hover {
+  transform: translateY(-3px);
+}
+.ocean-puzzle-tile.is-empty {
+  border: 2px dashed #0891b2;
+  background: #ffffff60;
+  box-shadow: none;
+}
+.puzzle-animal {
+  font-size: clamp(25px, 7vw, 72px);
+  line-height: 1;
+}
+.puzzle-number {
+  position: absolute;
+  top: 5px;
+  left: 7px;
+  display: flex;
+  width: 25px;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #075985;
+  background: #ffffffd9;
+  font-size: 14px;
+  font-weight: 900;
+}
+.game-stage-message {
+  min-height: 40px;
+  width: min(100%, 740px);
+  margin-inline: auto;
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: #ffffffc9;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #075985;
+}
+.ocean-bubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ocean-bubbles i {
+  position: absolute;
+  bottom: -70px;
+  left: calc(var(--bubble) * 13%);
+  width: calc(18px + var(--bubble) * 6px);
+  aspect-ratio: 1;
+  border: 2px solid #ffffff90;
+  border-radius: 50%;
+  animation: ocean-bubble 12s linear infinite;
+  animation-delay: calc(var(--bubble) * -1.7s);
+}
+.reward-celebration {
+  position: fixed;
+  margin: auto;
+  padding: 0;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  border: 2px solid #a5f3fc;
+  border-radius: 32px;
+  background: linear-gradient(150deg, #fff 60%, #ecfeff);
+  box-shadow: 0 30px 90px #07598540;
+}
+.reward-celebration::backdrop {
+  background: #082f494a;
+  backdrop-filter: blur(4px);
+}
+.reward-progress {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #14b8a6, #34d399);
+  transition: width 0.85s cubic-bezier(0.16, 0.7, 0.2, 1);
+}
+.reward-progress--reset {
+  transition: none;
+}
+.reward-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.reward-confetti i {
+  position: absolute;
+  top: -20px;
+  left: calc(var(--particle) * 6.6%);
+  width: 8px;
+  height: 14px;
+  background: #38bdf8;
+  border-radius: 3px;
+  animation: reward-confetti 2.1s ease-in both;
+  animation-delay: calc(var(--particle) * 45ms);
+}
+.reward-confetti i:nth-child(3n) {
+  background: #fbbf24;
+}
+.reward-confetti i:nth-child(3n + 1) {
+  background: #34d399;
+}
+.reward-confetti i:nth-child(4n) {
+  background: #fb7185;
+}
+.reward-emblem,
+.reward-xp {
+  animation: reward-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1.3) both;
+}
+.reward-xp {
+  animation-delay: 0.12s;
+}
+.ocean-game-stage button:focus-visible,
+.reward-celebration button:focus-visible {
+  outline: 3px solid #0284c7;
+  outline-offset: 4px;
+}
+@keyframes ocean-bubble {
+  to {
+    transform: translateY(-110dvh) translateX(25px);
+  }
+}
+@keyframes reward-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes reward-confetti {
+  to {
+    transform: translateY(500px) rotate(450deg);
+    opacity: 0;
+  }
+}
+@media (max-width: 480px) {
+  .game-stage-content {
+    gap: 12px;
+    padding-top: 12px;
+  }
+  .ocean-memory-board {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(100%, calc((100dvh - 290px) * 0.9));
+  }
+  .ocean-memory-card {
+    aspect-ratio: 1.2;
+  }
+  .ocean-puzzle-board {
+    width: min(100%, calc(100dvh - 290px));
+  }
+  .game-stage-status {
+    font-size: 12px;
+  }
+}
+@media (max-height: 500px) {
+  .game-stage-content {
+    justify-content: flex-start;
+  }
+  .ocean-memory-board {
+    width: min(100%, 540px);
+  }
+  .ocean-puzzle-board {
+    width: 280px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ocean-game-stage *,
+  .reward-celebration * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .reward-confetti,
+  .ocean-bubbles {
+    display: none;
+  }
+}

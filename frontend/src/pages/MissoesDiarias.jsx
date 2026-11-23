@@ -3,12 +3,14 @@ import { ArrowRight, Brain, CalendarDays, Check, CheckCheck, CircleAlert, Clock3
 import PageShell from "../components/PageShell";
 import { missoes as missoesAPI } from "../services/api";
 import { can } from "../services/permissions";
+import { useReward } from "../context/RewardContext";
 import { useAuth } from "../context/AuthContext";
 import { contentIcon } from "../services/contentIcons";
 import useContentAnchor from "../hooks/useContentAnchor";
 
 export default function MissoesDiarias() {
   const { user, atualizarUsuario } = useAuth();
+  const { celebrate } = useReward();
   const [catalogDate, setCatalogDate] = useState("");
   const [earnedToday, setEarnedToday] = useState(0);
   const currentCatalog = useRef("");
@@ -80,6 +82,7 @@ export default function MissoesDiarias() {
 
     try {
       const result = await missoesAPI.concluir(id, { ...(respostas[id] || {}), catalogDate });
+      celebrate(result, "Missão cumprida!");
       atualizarUsuario(result.usuario);
       await carregarMissoes();
       setRespostas((current) => ({ ...current, [id]: {} }));
