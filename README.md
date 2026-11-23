@@ -2,9 +2,12 @@
 
 Plataforma de educação ambiental com missões, trilhas de aprendizagem, jogos, conquistas e gestão de conteúdo. Frontend: React com JavaScript, React Router, Vite e Tailwind. Backend ativo: **Python, FastAPI e PostgreSQL**, com Psycopg e sem ORM. Requer Node.js **22.13+** para as ferramentas do frontend e Python **3.12+** para a API.
 
-## Direção de evolução
+## Estrutura do projeto
 
-A documentação acadêmica fornecida pelo usuário orienta as próximas entregas. O [plano de evolução](docs/PLANO_DE_EVOLUCAO.md) compara os 20 requisitos funcionais e as 20 regras de negócio com o código, organiza as lacunas por prioridade e registra critérios de aceite. O frontend permanece em React/JavaScript. A transição para Python/PostgreSQL está aplicada. Perfis e permissões, Unidades Escolares, contexto por sessão, etapas, turmas e vínculos de alunos estão implementados; a curva global de dez níveis ainda consta no plano de evolução.
+- `frontend/` reúne a interface React e suas configurações.
+- `backend/` reúne a API Python, as migrações e os testes.
+- `scripts/` reúne os comandos de desenvolvimento e manutenção.
+- `docs/` reúne os guias operacionais e a validação consolidada em `docs/validacao-mvp/`.
 
 ## Executar
 
@@ -36,9 +39,9 @@ O proxy usa IPv4 explícito e acompanha `PORT`. Em produção, publique `fronten
 
 ## Administrador
 
-Defina valores próprios no ambiente local para `GUARDIOES_DE_SAQUAREMA_ADMIN_CPF`, `GUARDIOES_DE_SAQUAREMA_ADMIN_PASSWORD`, `GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL` e, opcionalmente, `GUARDIOES_DE_SAQUAREMA_ADMIN_NAME`.
+Defina valores próprios no ambiente local para `GUARDIOES_DE_SAQUAREMA_ADMIN_CPF`, `GUARDIOES_DE_SAQUAREMA_ADMIN_EMAIL` e, opcionalmente, `GUARDIOES_DE_SAQUAREMA_ADMIN_NAME`.
 
-O usuário aceita 3 a 40 letras minúsculas, números, ponto, hífen e sublinhado. A senha exige 12 a 256 caracteres. O email deve ser exclusivo.
+O acesso administrativo utiliza CPF. O provisionamento gera uma senha temporária aleatória, válida por 24 horas, que deve ser substituída no primeiro acesso. A senha pessoal do administrador exige 12 a 256 caracteres. O email deve ser exclusivo.
 
 Execute `npm run admin:create` para provisionar o administrador inicial. O comando exibe uma senha temporária aleatória, válida por 24 horas, com troca obrigatória no primeiro acesso. Repetir o comando preserva a conta existente. A redefinição ocorre no painel, com nova senha aleatória e revogação das sessões. Para recuperação do administrador pelo operador institucional autorizado no ambiente local, use `npm run admin:create -- --reset-password`.
 
@@ -62,11 +65,11 @@ As contas administrativas existentes são preservadas. Revise contas criadas pel
 
 As rotas estão em `frontend/src/routes`, as páginas em `frontend/src/pages`, a tela reutilizável de login em `frontend/src/components/LoginScreen.jsx` e a API ativa em `backend/python/gds`. O código Node em `backend/src` é legado explícito para regressão e reversão controlada. Veja [operação, migração e testes do backend](backend/README.md).
 
-Consulte [o relatório técnico](docs/REVISAO_TECNICA.md) para a estrutura anterior e atual, arquivos removidos, decisões de compatibilidade, testes executados e pendências.
+Consulte [a validação consolidada do MVP](docs/validacao-mvp/README.md) para os resultados da suíte integral, as evidências e as limitações verificadas.
 
 ## Perfis de acesso
 
-Em Administração > Gerenciar Usuários e Perfis, a aba **Perfis de acesso** permite consultar Administrador, Gestão Escolar e Aluno, criar perfis personalizados e definir módulos/ações. Atribua o perfil no cadastro ou na edição do usuário. A API verifica as permissões em cada requisição. Consulte [a matriz e as regras de delegação](docs/PERFIS_DE_ACESSO.md); recursos escolares identificados como previstos continuam pendentes.
+Em Administração > Gerenciar Usuários e Perfis, a aba **Perfis de acesso** permite consultar Administrador, Gestão Escolar e Aluno, criar perfis personalizados e definir módulos/ações. Atribua o perfil no cadastro ou na edição do usuário. A API verifica as permissões em cada requisição. Consulte [a matriz e as regras de delegação](docs/PERFIS_DE_ACESSO.md).
 
 ## Unidades Escolares
 
@@ -74,7 +77,7 @@ Em Administração > Gerenciar Unidades Escolares, cadastre o nome da unidade e 
 
 ## Gestão de Turmas e Alunos
 
-O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadastra turmas por etapa, vincula/transfere alunos e consulta progresso e consolidados sem editar XP. O administrador define escola e matrícula no cadastro do aluno e mantém as **Etapas Escolares** ao lado de Perfis de acesso, com padrões do 2º ao 6º ano. Consulte [fluxos, autorização e integridade](docs/GESTAO_TURMAS_E_ALUNOS.md).
+O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadastra turmas por etapa, vincula/transfere alunos e consulta progresso e consolidados sem editar XP. O administrador define escola e matrícula no cadastro do aluno e mantém as **Etapas Escolares** dentro de Gestão de Unidades Escolares, com padrões do 2º ao 6º ano. Consulte [fluxos, autorização e integridade](docs/GESTAO_TURMAS_E_ALUNOS.md).
 
 ## Desativação e saída
 
