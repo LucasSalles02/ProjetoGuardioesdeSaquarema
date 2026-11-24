@@ -10,7 +10,7 @@ Referências das bibliotecas: [FastAPI](https://fastapi.tiangolo.com/advanced/ev
 - Foram importados e conferidos os registros das 12 tabelas de negócio existentes, preservando IDs, hashes, sessões, XP, conclusões e sessões de jogo em andamento.
 - O SQLite original permanece em `backend/data/ecomar.sqlite`. A cópia consistente utilizada na importação fica em `backend/data/backups/`.
 - A curva antiga de XP e o limite histórico de 80 atividades foram preservados nesta migração de tecnologia. EV02 e EV03 continuam pendentes no plano; não foram misturados à transição.
-- A etapa posterior de controle administrativo acrescentou o perfil `GESTOR_ESCOLAR` e cadastro/consulta/desativação pelo administrador. Unidades, vínculos institucionais, turmas, etapas e consultas pedagógicas estão implementados; consulte [Gestão de Turmas e Alunos](../docs/GESTAO_TURMAS_E_ALUNOS.md).
+- A etapa posterior de controle administrativo acrescentou o perfil `GESTOR_ESCOLAR` e cadastro/consulta/desativação pelo administrador. Unidades, vínculos institucionais, turmas, etapas e consultas pedagógicas estão implementados.
 
 ## Preparar outro ambiente
 
@@ -35,7 +35,7 @@ Os valores acima são marcadores, não credenciais reais. Não use prefixo `VITE
 
 ## Instância local isolada deste workspace
 
-O projeto permite usar Python instalado ou portátil e um cluster PostgreSQL isolado em `.runtime/`, ignorado pelo Git. Esses ambientes precisam ser preparados em cada computador; o clone do repositório não os instala. Consulte [o guia de configuração em outro PC](../docs/CONFIGURACAO_EM_OUTRO_PC.md). O cluster escuta somente `127.0.0.1:55432`, usa senha aleatória e autenticação SCRAM. A conexão está no `.env` local; a configuração auxiliar está em `.runtime/local-postgres.json`. Os segredos não são impressos.
+O projeto permite usar Python instalado ou portátil e um cluster PostgreSQL isolado em `.runtime/`, ignorado pelo Git. Esses ambientes precisam ser preparados em cada computador; o clone do repositório não os instala. O cluster escuta somente `127.0.0.1:55432`, usa senha aleatória e autenticação SCRAM. A conexão está no `.env` local; a configuração auxiliar está em `.runtime/local-postgres.json`. Os segredos não são impressos.
 
 `.runtime/postgres-data` contém o banco persistente local: não é cache descartável. Faça backup antes de mover ou remover esse diretório.
 
@@ -83,7 +83,7 @@ Rotas ativas do frontend: `/login`, `/admin/login`, `/admin/dashboard` e `/gesta
 
 ## Gerenciamento administrativo de usuários
 
-O administrador cadastra alunos por nome completo e matrícula única e profissionais por nome completo, CPF único e e-mail profissional. Data de nascimento é opcional. Não há campo de nome de usuário no formulário. Vínculos de escola e turma seguem os controles institucionais. Consulte [cadastro por categoria](../docs/CADASTRO_E_AUTENTICACAO.md).
+O administrador cadastra alunos por nome completo e matrícula única e profissionais por nome completo, CPF único e e-mail profissional. Data de nascimento é opcional. Não há campo de nome de usuário no formulário. Vínculos de escola e turma seguem os controles institucionais.
 
 O sistema gera uma senha temporária individual e aleatória, armazenada com hash scrypt e validade de 24 horas a partir da emissão. A credencial é devolvida somente na resposta administrativa de criação, redefinição ou mudança de identidade/categoria que exija novo primeiro acesso. As consultas não revelam a senha. Alunos entram por matrícula e profissionais por CPF. A troca obrigatória impede acesso aos módulos até a definição de senha pessoal e invalida a temporária. Credenciais expiradas exigem nova emissão. Login por e-mail ou nome de usuário está desativado.
 
@@ -102,7 +102,7 @@ Desativar preserva usuário, histórico, conquistas e progresso. A conta não po
 
 Edição e reset exigem administrador ativo com senha pessoal definida e permissões efetivas compatíveis. Alterar identificador ou perfil revoga sessões. Contas pendentes recebem nova senha aleatória quando seus identificadores mudam. Senhas pessoais são preservadas nas edições comuns. Alterar categoria exige novo primeiro acesso. Complete identificadores ausentes antes da emissão. O reset preserva situação da conta, vínculos e progresso.
 
-As migrações `003_cpf_first_access.sql` e `004_registration_requests.sql` adicionam CPF, nascimento, troca obrigatória e fila de solicitações, preservando dados e senhas existentes. Reativação de contas e exclusão definitiva de usuários continuam fora desta etapa. As entregas posteriores de vínculos, unidades, turmas e etapas estão descritas em [Gestão de Turmas e Alunos](../docs/GESTAO_TURMAS_E_ALUNOS.md).
+As migrações `003_cpf_first_access.sql` e `004_registration_requests.sql` adicionam CPF, nascimento, troca obrigatória e fila de solicitações, preservando dados e senhas existentes. Reativação de contas e exclusão definitiva de usuários continuam fora desta etapa.
 
 ## Cadastro exclusivo pela administração
 
@@ -165,8 +165,8 @@ backend/
 
 ## Unidades Escolares e vínculos
 
-O gerenciamento da divulgação na tela inicial é documentado em [Destaques: cadastro, imagens, permissões e API](../docs/DESTAQUES.md). A migração `014_home_highlights.sql` cria a estrutura vazia, sem conteúdos ou imagens de exemplo.
+A migração `014_home_highlights.sql` cria a estrutura vazia, sem conteúdos ou imagens de exemplo.
 
-A migração `006_school_units.sql` implementa Escola e VinculoGestorEscola. A listagem do gestor usa os vínculos autorizados da conta autenticada; editar o cadastro de usuário ou um campo de escola em texto não concede esse acesso. Consulte [API, permissões e campos](../docs/UNIDADES_ESCOLARES.md).
+A migração `006_school_units.sql` implementa Escola e VinculoGestorEscola. A listagem do gestor usa os vínculos autorizados da conta autenticada; editar o cadastro de usuário ou um campo de escola em texto não concede esse acesso.
 
 A migração `007_session_school_context.sql` mantém a unidade ativa por sessão. `GET/POST /api/school-context` consultam/trocam a seleção; `GET /api/school-current` retorna somente a unidade ativa autorizada. Um novo login exige nova escolha; recarregar a mesma sessão preserva a seleção após validar o vínculo. Os códigos `UNIDADE_OBRIGATORIA` e `UNIDADE_DESATUALIZADA` retornam HTTP 409 e atualizam o seletor no navegador.

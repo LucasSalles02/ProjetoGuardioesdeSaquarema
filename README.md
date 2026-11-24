@@ -7,11 +7,11 @@ Plataforma de educação ambiental com missões, trilhas de aprendizagem, jogos,
 - `frontend/` reúne a interface React e suas configurações.
 - `backend/` reúne a API Python, as migrações e os testes.
 - `scripts/` reúne os comandos de desenvolvimento e manutenção.
-- `docs/` reúne os guias operacionais e a validação consolidada em `docs/validacao-mvp/`.
+- `docs/` contém o arquivo único de evidências dos testes para o apêndice acadêmico.
 
 ## Executar
 
-**Em outro PC, inclusive sem PostgreSQL configurado, siga primeiro o [guia completo de instalação](docs/CONFIGURACAO_EM_OUTRO_PC.md).** Ele cobre instalação do banco, ambiente Python, `.env`, migrações e administrador inicial. O GitHub contém o código e as migrações; dados e credenciais locais não são transferidos pelo Git. Consulte também a [operação do backend e importação](backend/README.md).
+Em outro PC, consulte as instruções de instalação e operação em [backend/README.md](backend/README.md). O GitHub contém o código e as migrações; dados e credenciais locais não são transferidos pelo Git. Consulte também a [operação do backend e importação](backend/README.md).
 
 ```sh
 npm ci
@@ -45,9 +45,9 @@ O acesso administrativo utiliza CPF. O provisionamento gera uma senha temporári
 
 Execute `npm run admin:create` para provisionar o administrador inicial. O comando exibe uma senha temporária aleatória, válida por 24 horas, com troca obrigatória no primeiro acesso. Repetir o comando preserva a conta existente. A redefinição ocorre no painel, com nova senha aleatória e revogação das sessões. Para recuperação do administrador pelo operador institucional autorizado no ambiente local, use `npm run admin:create -- --reset-password`.
 
-No painel administrativo, cadastre, consulte, edite, desative e redefina o acesso de alunos, gestores e administradores. Alunos utilizam matrícula única e profissionais utilizam CPF no login. O sistema gera a senha temporária e a exibe na janela de entrega administrativa. Consulte [cadastro e autenticação](docs/CADASTRO_E_AUTENTICACAO.md).
+No painel administrativo, cadastre, consulte, edite, desative e redefina o acesso de alunos, gestores e administradores. Alunos utilizam matrícula única e profissionais utilizam CPF no login. O sistema gera a senha temporária e a exibe na janela de entrega administrativa.
 
-O cadastro de usuários é exclusivo do administrador. O cadastro público está desativado. A troca da senha temporária em `/primeiro-acesso` é obrigatória antes de acessar os módulos. Redefinição e desativação revogam as sessões e preservam o histórico. A gestão escolar está descrita em [Gestão de Turmas e Alunos](docs/GESTAO_TURMAS_E_ALUNOS.md).
+O cadastro de usuários é exclusivo do administrador. O cadastro público está desativado. A troca da senha temporária em `/primeiro-acesso` é obrigatória antes de acessar os módulos. Redefinição e desativação revogam as sessões e preservam o histórico.
 
 ## Dados e compatibilidade
 
@@ -65,19 +65,19 @@ As contas administrativas existentes são preservadas. Revise contas criadas pel
 
 As rotas estão em `frontend/src/routes`, as páginas em `frontend/src/pages`, a tela reutilizável de login em `frontend/src/components/LoginScreen.jsx` e a API ativa em `backend/python/gds`. O código Node em `backend/src` é legado explícito para regressão e reversão controlada. Veja [operação, migração e testes do backend](backend/README.md).
 
-Consulte [a validação consolidada do MVP](docs/validacao-mvp/README.md) para os resultados da suíte integral, as evidências e as limitações verificadas.
+Consulte [as evidências da validação do MVP](docs/EVIDENCIAS_TESTES_MVP.md) para os resultados da suíte integral, as evidências e as limitações verificadas.
 
 ## Perfis de acesso
 
-Em Administração > Gerenciar Usuários e Perfis, a aba **Perfis de acesso** permite consultar Administrador, Gestão Escolar e Aluno, criar perfis personalizados e definir módulos/ações. Atribua o perfil no cadastro ou na edição do usuário. A API verifica as permissões em cada requisição. Consulte [a matriz e as regras de delegação](docs/PERFIS_DE_ACESSO.md).
+Em Administração > Gerenciar Usuários e Perfis, a aba **Perfis de acesso** permite consultar Administrador, Gestão Escolar e Aluno, criar perfis personalizados e definir módulos/ações. Atribua o perfil no cadastro ou na edição do usuário. A API verifica as permissões em cada requisição.
 
 ## Unidades Escolares
 
-Em Administração > Gerenciar Unidades Escolares, cadastre o nome da unidade e autorize seus gestores. O ID é gerado automaticamente. Antes de entrar, o gestor escolhe uma unidade autorizada em `/selecionar-unidade`. A página inicial e o perfil exibem a unidade ativa; o menu do perfil permite trocar para outra unidade vinculada. A seleção é validada pela API e mantida por sessão. Consulte [campos do diagrama e regras de autorização](docs/UNIDADES_ESCOLARES.md).
+Em Administração > Gerenciar Unidades Escolares, cadastre o nome da unidade e autorize seus gestores. O ID é gerado automaticamente. Antes de entrar, o gestor escolhe uma unidade autorizada em `/selecionar-unidade`. A página inicial e o perfil exibem a unidade ativa; o menu do perfil permite trocar para outra unidade vinculada. A seleção é validada pela API e mantida por sessão.
 
 ## Gestão de Turmas e Alunos
 
-O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadastra turmas por etapa, vincula/transfere alunos e consulta progresso e consolidados sem editar XP. O administrador define escola e matrícula no cadastro do aluno e mantém as **Etapas Escolares** dentro de Gestão de Unidades Escolares, com padrões do 2º ao 6º ano. Consulte [fluxos, autorização e integridade](docs/GESTAO_TURMAS_E_ALUNOS.md).
+O gestor acessa **Gestão > Gestão de Turmas e Alunos** na unidade ativa, cadastra turmas por etapa, vincula/transfere alunos e consulta progresso e consolidados sem editar XP. O administrador define escola e matrícula no cadastro do aluno e mantém as **Etapas Escolares** dentro de Gestão de Unidades Escolares, com padrões do 2º ao 6º ano.
 
 ## Desativação e saída
 
@@ -85,9 +85,9 @@ Unidades Escolares possui abas de ativas e desativadas. Desativar exige confirma
 
 Na Gestão de Turmas e Alunos, o Administrador acessa qualquer unidade somente para consulta. Criar/editar turmas e vincular/transferir alunos entre turmas são operações exclusivas do Gestor Escolar, protegidas na API e pela migração `010_admin_classes_read_only.sql`.
 
-XP e conquistas seguem a progressão de dez níveis do relatório atualizado, com nível máximo aos 1.200 XP. Consulte [as regras e a compatibilidade dos dados](docs/XP_NIVEIS_E_CONQUISTAS.md); execute as migrações ao atualizar.
+XP e conquistas seguem a progressão de dez níveis do relatório atualizado, com nível máximo aos 1.200 XP.
 
-Alunos acessam por matrícula e profissionais por CPF, acompanhados da senha pessoal ou temporária aleatória. Consulte [cadastro, privacidade e migração de contas existentes](docs/CADASTRO_E_AUTENTICACAO.md).
+Alunos acessam por matrícula e profissionais por CPF, acompanhados da senha pessoal ou temporária aleatória.
 
 ## Frontend
 
@@ -95,4 +95,4 @@ A interface e suas configuracoes ficam em `frontend/`. O projeto usa npm workspa
 
 Os comandos da raiz continuam disponiveis: `npm run dev` inicia API e interface, `npm run dev:frontend` inicia apenas a interface e `npm run build` gera `frontend/dist/`. Dentro de `frontend`, tambem e possivel executar `npm run dev`, `npm run lint`, `npm run build` e `npm run preview`. O arquivo `.env` compartilhado permanece na raiz e e carregado pela configuracao do Vite.
 
-Regras de XP, limites diários dos minigames, disponibilidade e repetibilidade das missões estão descritas em [XP, níveis e conquistas](docs/XP_NIVEIS_E_CONQUISTAS.md). Após atualizar o código, execute `npm run db:migrate` e reinicie a API.
+Após atualizar o código, execute `npm run db:migrate` e reinicie a API.
